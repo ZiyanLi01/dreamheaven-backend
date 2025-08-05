@@ -278,6 +278,52 @@ EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
+## 🖼️ High-Quality Image Management
+
+### **Image Upgrade Process**
+The backend includes scripts to fetch and validate high-quality images:
+
+#### **Option 1: No API Key Required (Recommended for MVP)**
+```bash
+# One-click upgrade (no API key needed)
+python scripts/upgrade_images.py
+
+# Or step by step:
+python scripts/fetch_high_quality_images.py
+python scripts/update_listings_with_images.py
+```
+
+#### **Option 2: With Unsplash API Key (For Production)**
+```bash
+# Requires UNSPLASH_ACCESS_KEY in .env
+python scripts/fetch_unsplash_images.py
+python scripts/update_listings_with_images.py
+```
+
+### **Setup Options**
+
+#### **Quick Start (No API Key)**
+No setup required! Uses curated high-quality images:
+- ✅ **50 pre-selected high-quality images**
+- ✅ **No API key needed**
+- ✅ **Immediate use**
+
+#### **Production Setup (With API Key)**
+Add your Unsplash API key to `.env`:
+```bash
+UNSPLASH_ACCESS_KEY=your_unsplash_access_key
+```
+Benefits:
+- 🔄 **Dynamic image selection**
+- 📈 **Higher rate limits**
+- 🎯 **Better search results**
+
+### **Image Statistics**
+- **50 high-quality images** (curated or from API)
+- **2000 listings** with 3-8 images each
+- **40x image reuse** (2000 × 5 / 50)
+- **Verified URLs** - all images tested and working
+
 ## 🔮 Future Features
 
 - **RAG Integration**: AI-powered natural language search
