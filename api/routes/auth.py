@@ -17,17 +17,17 @@ supabase = SupabaseManager()
 security = HTTPBearer()
 
 # Pydantic models
-class UserLogin(BaseModel):
+class BuyerLogin(BaseModel):
     email: EmailStr
     password: str
 
-class UserRegister(BaseModel):
+class BuyerRegister(BaseModel):
     email: EmailStr
     password: str
     first_name: str
     last_name: str
     phone: Optional[str] = None
-    is_host: bool = False
+    preferences: Optional[dict] = None  # For saving search preferences
 
 class AuthResponse(BaseModel):
     access_token: str
@@ -42,13 +42,13 @@ class PasswordUpdate(BaseModel):
     password: str
 
 @router.post("/login", response_model=AuthResponse)
-async def login(user_credentials: UserLogin):
-    """User login with email and password"""
+async def login(buyer_credentials: BuyerLogin):
+    """Buyer login with email and password"""
     try:
         # Authenticate with Supabase
         auth_response = supabase.client.auth.sign_in_with_password({
-            "email": user_credentials.email,
-            "password": user_credentials.password
+            "email": buyer_credentials.email,
+            "password": buyer_credentials.password
         })
         
         if auth_response.user:
@@ -72,43 +72,44 @@ async def login(user_credentials: UserLogin):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
 @router.post("/register", response_model=AuthResponse)
-async def register(user_data: UserRegister):
-    """User registration"""
+async def register(buyer_data: BuyerRegister):
+    """Buyer registration"""
     try:
-        # Create user in Supabase Auth
+        # Create buyer in Supabase Auth
         auth_response = supabase.client.auth.sign_up({
-            "email": user_data.email,
-            "password": user_data.password,
+            "email": buyer_data.email,
+            "password": buyer_data.password,
             "options": {
                 "data": {
-                    "first_name": user_data.first_name,
-                    "last_name": user_data.last_name
+                    "first_name": buyer_data.first_name,
+                    "last_name": buyer_data.last_name,
+                    "user_type": "buyer"
                 }
             }
         })
         
         if auth_response.user:
-            # Create profile in profiles table
-            profile_data = {
+            # Create buyer profile in buyers table
+            buyer_profile_data = {
                 "id": auth_response.user.id,
-                "email": user_data.email,
-                "first_name": user_data.first_name,
-                "last_name": user_data.last_name,
-                "full_name": f"{user_data.first_name} {user_data.last_name}",
-                "phone": user_data.phone,
-                "is_host": user_data.is_host,
+                "email": buyer_data.email,
+                "first_name": buyer_data.first_name,
+                "last_name": buyer_data.last_name,
+                "full_name": f"{buyer_data.first_name} {buyer_data.last_name}",
+                "phone": buyer_data.phone,
+                "preferences": buyer_data.preferences or {},
                 "is_verified": False,
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat()
             }
             
-            profile_result = supabase.client.table("profiles").insert(profile_data).execute()
-            user_profile = profile_result.data[0] if profile_result.data else profile_data
+            buyer_result = supabase.client.table("buyers").insert(buyer_profile_data).execute()
+            buyer_profile = buyer_result.data[0] if buyer_result.data else buyer_profile_data
             
             return AuthResponse(
                 access_token=auth_response.session.access_token,
                 refresh_token=auth_response.session.refresh_token,
-                user=user_profile,
+                user=buyer_profile,
                 expires_in=auth_response.session.expires_in
             )
         else:

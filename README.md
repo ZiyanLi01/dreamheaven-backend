@@ -7,9 +7,27 @@ A modern FastAPI backend for the Dream Haven real estate platform, featuring AI-
 - **FastAPI Backend**: High-performance REST API with automatic documentation
 - **Supabase Integration**: PostgreSQL database with real-time capabilities
 - **Data Generation**: Automated creation of realistic real estate data
-- **Authentication**: Complete user authentication and authorization system
+- **Authentication**: Complete buyer authentication and authorization system
 - **Search API**: Advanced search with filters, sorting, and geolocation
 - **AI-Ready**: Prepared for RAG (Retrieval-Augmented Generation) integration
+
+## 👥 User Roles
+
+### **🏠 Hosts (Property Owners)**
+- Property owners who list their properties
+- Managed directly in the database (no authentication needed)
+- Currently: 5 demo hosts with 2000 listings
+
+### **👤 Buyers (Property Seekers)**
+- People looking to buy/rent properties
+- Need authentication for advanced features
+- Can browse listings without login
+- Require login for AI-powered search
+
+### **👀 Visitors**
+- Anonymous users browsing listings
+- No authentication required
+- Access to basic search and filtering
 
 ## 📁 Project Structure
 
@@ -167,27 +185,27 @@ The API will be available at:
 ## 📚 API Endpoints
 
 ### Authentication (`/api/auth`)
-- `POST /login` - User login
-- `POST /register` - User registration
-- `POST /logout` - User logout
+- `POST /login` - Buyer login
+- `POST /register` - Buyer registration
+- `POST /logout` - Buyer logout
 - `POST /refresh` - Refresh access token
-- `GET /me` - Get current user
+- `GET /me` - Get current buyer
 - `POST /forgot-password` - Send password reset email
 - `POST /reset-password` - Reset password
 - `POST /change-password` - Change password
 - `POST /verify-email` - Verify email address
 
-### Users (`/api/users`)
-- `GET /` - Get all users
-- `GET /{user_id}` - Get specific user
-- `GET /email/{email}` - Get user by email
-- `POST /` - Create user
-- `PUT /{user_id}` - Update user
-- `DELETE /{user_id}` - Delete user
-- `GET /hosts/list` - Get all hosts
-- `GET /verified/list` - Get verified users
-- `PUT /{user_id}/verify` - Verify user
-- `PUT /{user_id}/unverify` - Unverify user
+### Buyers (`/api/buyers`)
+- `GET /` - Get all buyers
+- `GET /{buyer_id}` - Get specific buyer
+- `GET /email/{email}` - Get buyer by email
+- `PUT /{buyer_id}` - Update buyer
+- `DELETE /{buyer_id}` - Delete buyer
+- `GET /verified/list` - Get verified buyers
+- `PUT /{buyer_id}/verify` - Verify buyer
+- `PUT /{buyer_id}/unverify` - Unverify buyer
+- `PUT /{buyer_id}/preferences` - Update buyer preferences
+- `GET /{buyer_id}/preferences` - Get buyer preferences
 
 ### Listings (`/api/listings`)
 - `GET /` - Get all listings with filters
@@ -200,11 +218,11 @@ The API will be available at:
 - `GET /types/list` - Get all property types
 
 ### Search (`/api/search`)
-- `GET /` - Search listings with filters
-- `GET /nearby` - Search listings by location
-- `GET /suggestions` - Get search suggestions
-- `GET /stats` - Get search statistics
-- `POST /ai-search` - AI-powered search (coming soon)
+- `GET /` - Search listings with filters (public)
+- `GET /nearby` - Search listings by location (public)
+- `GET /suggestions` - Get search suggestions (public)
+- `GET /stats` - Get search statistics (public)
+- `POST /ai-search` - AI-powered search (requires authentication)
 
 ## 🔧 Configuration
 

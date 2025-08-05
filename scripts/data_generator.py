@@ -223,10 +223,12 @@ class RealEstateDataGenerator:
         images = []
         
         for i in range(num_images):
-            # Use Unsplash for realistic real estate images
+            # Use Lorem Picsum for reliable demo images
             width = random.choice([800, 1200, 1600])
             height = random.choice([600, 800, 1200])
-            images.append(f"https://source.unsplash.com/{width}x{height}/?{property_type.lower()},real-estate&sig={i}")
+            # Generate a random ID for consistent images
+            image_id = random.randint(1, 1000)
+            images.append(f"https://picsum.photos/{width}/{height}?random={image_id}")
         
         return images
     

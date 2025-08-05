@@ -9,7 +9,7 @@ import os
 load_dotenv()
 
 # Import routers
-from api.routes import listings, users, auth, search
+from api.routes import listings, buyers, auth, search
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,7 +37,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(users.router, prefix="/api/users", tags=["Users"])
+app.include_router(buyers.router, prefix="/api/buyers", tags=["Buyers"])
 app.include_router(listings.router, prefix="/api/listings", tags=["Listings"])
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
 

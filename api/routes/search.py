@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import List, Optional
 from pydantic import BaseModel
 import sys
@@ -12,6 +13,7 @@ from scripts.supabase_manager import SupabaseManager
 
 router = APIRouter()
 supabase = SupabaseManager()
+security = HTTPBearer()
 
 # Pydantic models
 class SearchResult(BaseModel):
@@ -262,11 +264,28 @@ async def get_search_stats():
 
 # Placeholder for future RAG integration
 @router.post("/ai-search")
-async def ai_search(query: str):
-    """AI-powered natural language search (RAG integration)"""
-    # This will be implemented when RAG module is integrated
-    return {
-        "message": "AI search coming soon!",
-        "query": query,
-        "results": []
-    } 
+async def ai_search(
+    query: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """AI-powered natural language search (RAG integration) - Requires authentication"""
+    try:
+        # Verify authentication
+        supabase.client.auth.set_session(credentials.credentials, None)
+        user = supabase.client.auth.get_user()
+        
+        if not user.user:
+            raise HTTPException(status_code=401, detail="Authentication required for AI search")
+        
+        # This will be implemented when RAG module is integrated
+        return {
+            "message": "AI search coming soon!",
+            "query": query,
+            "results": [],
+            "user_id": user.user.id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Authentication required for AI search") 

@@ -12,22 +12,15 @@ class SupabaseManager:
         self.anon_client = Config.get_supabase_anon_client()
     
     def create_user(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a user in Supabase Auth and profiles table"""
+        """Create a user in profiles table (demo only, no auth)"""
         try:
-            # Create user in Auth
-            auth_user = self.client.auth.admin.create_user({
-                "email": user_data["email"],
-                "password": "DreamHaven2024!",  # Default password
-                "email_confirm": True,
-                "user_metadata": {
-                    "first_name": user_data["first_name"],
-                    "last_name": user_data["last_name"]
-                }
-            })
+            # Generate a UUID for the user
+            import uuid
+            user_id = str(uuid.uuid4())
             
             # Create profile in profiles table
             profile_data = {
-                "id": auth_user.user.id,
+                "id": user_id,
                 "email": user_data["email"],
                 "first_name": user_data["first_name"],
                 "last_name": user_data["last_name"],
@@ -43,9 +36,9 @@ class SupabaseManager:
             
             result = self.client.table("profiles").insert(profile_data).execute()
             
-            print(f"✅ Created user: {user_data['email']}")
+            print(f"✅ Created demo user: {user_data['email']}")
             return {
-                "auth_user": auth_user.user,
+                "auth_user": type('User', (), {'id': user_id})(),
                 "profile": result.data[0] if result.data else None
             }
             
