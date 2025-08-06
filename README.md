@@ -1,8 +1,8 @@
-# Dream Haven Backend 🏠
+# Dream Haven Backend
 
 A modern FastAPI backend for the Dream Haven real estate platform, featuring AI-powered search capabilities and comprehensive property management.
 
-## 🚀 Features
+## Features
 
 - **FastAPI Backend**: High-performance REST API with automatic documentation
 - **Supabase Integration**: PostgreSQL database with real-time capabilities
@@ -11,25 +11,25 @@ A modern FastAPI backend for the Dream Haven real estate platform, featuring AI-
 - **Search API**: Advanced search with filters, sorting, and geolocation
 - **AI-Ready**: Prepared for RAG (Retrieval-Augmented Generation) integration
 
-## 👥 User Roles
+## User Roles
 
-### **🏠 Hosts (Property Owners)**
+### **Hosts (Property Owners)**
 - Property owners who list their properties
 - Managed directly in the database (no authentication needed)
 - Currently: 5 demo hosts with 2000 listings
 
-### **👤 Buyers (Property Seekers)**
+### **Buyers (Property Seekers)**
 - People looking to buy/rent properties
 - Need authentication for advanced features
 - Can browse listings without login
 - Require login for AI-powered search
 
-### **👀 Visitors**
+### **Visitors**
 - Anonymous users browsing listings
 - No authentication required
 - Access to basic search and filtering
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 dreamheaven-backend/
@@ -42,19 +42,24 @@ dreamheaven-backend/
 │   ├── config.py          # Configuration management
 │   ├── data_generator.py  # Real estate data generation
 │   ├── supabase_manager.py # Database operations
-│   └── generate_data.py   # Main data generation script
+│   ├── generate_data.py   # Main data generation script
+│   ├── fetch_unsplash_images.py # Unsplash API integration
+│   ├── fetch_high_quality_images.py # Curated images (no API key)
+│   ├── update_listings_with_images.py # Image update utilities
+│   ├── upgrade_images.py  # One-click image upgrade
+│   └── check_and_update_remaining.py # Check for remaining updates
 ├── api/                   # API routes
 │   ├── __init__.py
 │   └── routes/
 │       ├── __init__.py
 │       ├── auth.py        # Authentication endpoints
-│       ├── users.py       # User management
+│       ├── buyers.py      # Buyer management
 │       ├── listings.py    # Property listings CRUD
 │       └── search.py      # Search functionality
 └── data/                  # Generated data backups
 ```
 
-## 🛠️ Setup Instructions
+## Setup Instructions
 
 ### 1. Prerequisites
 
@@ -146,6 +151,25 @@ CREATE TABLE listings (
 );
 ```
 
+#### Buyers Table
+```sql
+CREATE TABLE buyers (
+    id UUID PRIMARY KEY REFERENCES auth.users(id),
+    email TEXT UNIQUE NOT NULL,
+    first_name TEXT,
+    last_name TEXT,
+    phone TEXT,
+    preferences JSONB,
+    is_verified BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes
+CREATE INDEX idx_buyers_email ON buyers(email);
+CREATE INDEX idx_buyers_verified ON buyers(is_verified);
+```
+
 ### 5. Data Generation
 
 Generate sample data for testing:
@@ -182,7 +206,7 @@ The API will be available at:
 - **Alternative Docs**: http://localhost:8000/redoc
 - **Health Check**: http://localhost:8000/health
 
-## 📚 API Endpoints
+## API Endpoints
 
 ### Authentication (`/api/auth`)
 - `POST /login` - Buyer login
@@ -224,7 +248,7 @@ The API will be available at:
 - `GET /stats` - Get search statistics (public)
 - `POST /ai-search` - AI-powered search (requires authentication)
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -245,7 +269,7 @@ The data generator creates realistic real estate data including:
 - **10 Property Types**: Apartment, House, Condo, Townhouse, Villa, Studio, Loft, Penthouse, Duplex, Cottage
 - **21 Amenities**: WiFi, Air Conditioning, Heating, Kitchen, Washing Machine, Dryer, Dishwasher, Parking, Gym, Pool, Garden, Balcony, Fireplace, Elevator, Doorman, Security System, Pet Friendly, Furnished, Mountain View, Ocean View, City View
 
-## 🧪 Testing
+## Testing
 
 ```bash
 # Run tests (when implemented)
@@ -255,7 +279,7 @@ pytest
 curl http://localhost:8000/health
 ```
 
-## 🚀 Deployment
+## Deployment
 
 ### Railway Deployment
 
@@ -278,7 +302,7 @@ EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-## 🖼️ High-Quality Image Management
+## High-Quality Image Management
 
 ### **Image Upgrade Process**
 The backend includes scripts to fetch and validate high-quality images:
@@ -304,9 +328,9 @@ python scripts/update_listings_with_images.py
 
 #### **Quick Start (No API Key)**
 No setup required! Uses curated high-quality images:
-- ✅ **50 pre-selected high-quality images**
-- ✅ **No API key needed**
-- ✅ **Immediate use**
+- **50 pre-selected high-quality images**
+- **No API key needed**
+- **Immediate use**
 
 #### **Production Setup (With API Key)**
 Add your Unsplash API key to `.env`:
@@ -314,17 +338,17 @@ Add your Unsplash API key to `.env`:
 UNSPLASH_ACCESS_KEY=your_unsplash_access_key
 ```
 Benefits:
-- 🔄 **Dynamic image selection**
-- 📈 **Higher rate limits**
-- 🎯 **Better search results**
+- **Dynamic image selection**
+- **Higher rate limits**
+- **Better search results**
 
 ### **Image Statistics**
-- **50 high-quality images** (curated or from API)
-- **2000 listings** with 3-8 images each
-- **40x image reuse** (2000 × 5 / 50)
+- **10 high-quality images** (curated or from API)
+- **2000 listings** with 1 image each
+- **200x image reuse** (2000 ÷ 10)
 - **Verified URLs** - all images tested and working
 
-## 🔮 Future Features
+## Future Features
 
 - **RAG Integration**: AI-powered natural language search
 - **Real-time Updates**: WebSocket support for live updates
@@ -333,7 +357,7 @@ Benefits:
 - **Reviews & Ratings**: User review system
 - **Analytics**: Property performance metrics
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -341,11 +365,11 @@ Benefits:
 4. Add tests if applicable
 5. Submit a pull request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🆘 Support
+## Support
 
 For support and questions:
 - Create an issue in the repository
@@ -354,4 +378,4 @@ For support and questions:
 
 ---
 
-**Dream Haven Backend** - Building the future of real estate search 🏠✨ 
+**Dream Haven Backend** - Building the future of real estate search 
