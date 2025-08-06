@@ -39,7 +39,7 @@ class ListingImageUpdater:
             print(f"❌ Error loading images: {e}")
             return []
     
-    def generate_listing_images(self, image_urls: List[str], num_images: int = 5) -> List[str]:
+    def generate_listing_images(self, image_urls: List[str], num_images: int = 1) -> List[str]:
         """Generate a list of images for a listing by cycling through available images"""
         if not image_urls:
             return []
@@ -73,25 +73,38 @@ class ListingImageUpdater:
         print("🖼️  Updating listings with high-quality images...")
         
         try:
-            # Get all listings
-            result = self.supabase.client.table("listings").select("id").execute()
+            # Get all listings with pagination to handle 2000+ records
+            all_listings = []
+            page = 0
+            page_size = 1000
             
-            if not result.data:
+            while True:
+                result = self.supabase.client.table("listings").select("id").range(page * page_size, (page + 1) * page_size - 1).execute()
+                
+                if not result.data:
+                    break
+                
+                all_listings.extend(result.data)
+                page += 1
+                
+                # If we got less than page_size, we've reached the end
+                if len(result.data) < page_size:
+                    break
+            
+            if not all_listings:
                 print("❌ No listings found")
                 return
             
-            listings = result.data
-            total_listings = len(listings)
+            total_listings = len(all_listings)
             print(f"📊 Found {total_listings} listings to update")
             
             # Update each listing
             updated_count = 0
-            for i, listing in enumerate(listings, 1):
+            for i, listing in enumerate(all_listings, 1):
                 try:
-                    # Generate 3-8 images for each listing
+                    # Generate 1 image for each listing
                     import random
-                    num_images = random.randint(3, 8)
-                    listing_images = self.generate_listing_images(image_urls, num_images)
+                    listing_images = self.generate_listing_images(image_urls, 1)
                     
                     # Update the listing
                     if self.update_listing_images(listing["id"], listing_images):
@@ -123,9 +136,8 @@ class ListingImageUpdater:
         cities = ["San Francisco", "New York", "Los Angeles", "Chicago", "Miami"]
         
         for i in range(num_listings):
-            # Generate 3-8 images for each listing
-            num_images = random.randint(3, 8)
-            listing_images = self.generate_listing_images(image_urls, num_images)
+            # Generate 1 image for each listing
+            listing_images = self.generate_listing_images(image_urls, 1)
             
             listing = {
                 "id": fake.uuid4(),
@@ -149,7 +161,7 @@ class ListingImageUpdater:
             json.dump(data, f, indent=2)
         
         print(f"💾 Saved {len(listings)} listings to listings_with_images.json")
-        print(f"🖼️  Used {len(image_urls)} unique images ({(len(listings) * 5) / len(image_urls):.1f}x reuse)")
+        print(f"🖼️  Used {len(image_urls)} unique images ({(len(listings) * 1) / len(image_urls):.1f}x reuse)")
 
 def main():
     """Main function"""
