@@ -129,7 +129,7 @@ def test_api_routes():
     print("\n🔍 Testing API routes...")
     
     try:
-        from api.routes import auth, users, listings, search
+        from api.routes import auth, buyers, listings, search
         print("✅ All API routes imported successfully")
         return True
     except Exception as e:

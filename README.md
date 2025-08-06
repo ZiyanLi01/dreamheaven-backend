@@ -170,7 +170,24 @@ CREATE INDEX idx_buyers_email ON buyers(email);
 CREATE INDEX idx_buyers_verified ON buyers(is_verified);
 ```
 
-### 5. Data Generation
+### 5. Database Migration
+
+Apply the database migration to add new fields for the enhanced listings API:
+
+```bash
+# Run the migration script
+python scripts/run_migration.py
+```
+
+This migration adds the following fields to the listings table:
+- `status` - Property status ("For Sale" or "For Rent")
+- `garages` - Number of garage spaces
+- `agent_name` - Name of the listing agent
+- `listing_age_days` - Days since listing was created
+- `image_url` - Primary image URL
+- Performance indexes for better query performance
+
+### 6. Data Generation
 
 Generate sample data for testing:
 
@@ -191,7 +208,7 @@ python scripts/generate_data.py cleanup
 python scripts/generate_data.py help
 ```
 
-### 6. Run the Application
+### 7. Run the Application
 
 ```bash
 # Development mode
@@ -232,7 +249,39 @@ The API will be available at:
 - `GET /{buyer_id}/preferences` - Get buyer preferences
 
 ### Listings (`/api/listings`)
-- `GET /` - Get all listings with filters
+- `GET /` - Get filtered property listings with pagination support
+  - **Query Parameters:**
+    - `location` (optional) - Filter by city/location
+    - `bedrooms` (optional, int) - Filter by number of bedrooms
+    - `bathrooms` (optional, int) - Filter by number of bathrooms
+    - `status` (optional) - Filter by status ("For Sale" or "For Rent")
+    - `page` (default: 1) - Page number for pagination
+    - `limit` (default: 30) - Number of records per page
+  - **Response Format:**
+    ```json
+    {
+      "results": [
+        {
+          "id": "uuid",
+          "status": "For Sale",
+          "address": "123 Main St",
+          "location": "New York, NY",
+          "sqft": 1500,
+          "garages": 2,
+          "bedrooms": 3,
+          "bathrooms": 2,
+          "agent": "John Smith",
+          "listingAge": "5 days ago",
+          "price": 450000.00,
+          "imageUrl": "https://example.com/image.jpg"
+        }
+      ],
+      "page": 1,
+      "limit": 30,
+      "total": 150,
+      "has_more": true
+    }
+    ```
 - `GET /{listing_id}` - Get specific listing
 - `POST /` - Create listing
 - `PUT /{listing_id}` - Update listing
@@ -277,6 +326,43 @@ pytest
 
 # Test specific endpoint
 curl http://localhost:8000/health
+
+# Test the new filtered listings endpoint
+python test_listings_endpoint.py
+```
+
+### Testing the Filtered Listings Endpoint
+
+The `test_listings_endpoint.py` script provides comprehensive testing for the new filtered listings API:
+
+```bash
+# Run all tests
+python test_listings_endpoint.py
+
+# Test specific scenarios:
+# - Basic endpoint without filters
+# - Pagination (page, limit)
+# - Location filtering
+# - Bedrooms/bathrooms filtering
+# - Status filtering (For Sale/For Rent)
+# - Combined filters
+# - Edge cases
+```
+
+Example API calls:
+
+```bash
+# Get all listings (first page)
+curl "http://localhost:8000/api/listings"
+
+# Get listings in New York with 3 bedrooms
+curl "http://localhost:8000/api/listings?location=New%20York&bedrooms=3"
+
+# Get "For Sale" properties with pagination
+curl "http://localhost:8000/api/listings?status=For%20Sale&page=2&limit=10"
+
+# Combined filters
+curl "http://localhost:8000/api/listings?location=Los%20Angeles&bedrooms=2&bathrooms=2&status=For%20Rent&page=1&limit=5"
 ```
 
 ## Deployment

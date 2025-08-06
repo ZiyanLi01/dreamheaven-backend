@@ -73,50 +73,148 @@ class ListingUpdate(BaseModel):
     is_available: Optional[bool] = None
     is_featured: Optional[bool] = None
 
-@router.get("/", response_model=List[ListingResponse])
-async def get_listings(
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(20, ge=1, le=100, description="Number of records to return"),
-    city: Optional[str] = Query(None, description="Filter by city"),
-    property_type: Optional[str] = Query(None, description="Filter by property type"),
-    min_price: Optional[float] = Query(None, ge=0, description="Minimum price per night"),
-    max_price: Optional[float] = Query(None, ge=0, description="Maximum price per night"),
-    min_bedrooms: Optional[int] = Query(None, ge=0, description="Minimum number of bedrooms"),
-    max_bedrooms: Optional[int] = Query(None, ge=0, description="Maximum number of bedrooms"),
-    available_only: bool = Query(True, description="Show only available listings"),
-    featured_only: bool = Query(False, description="Show only featured listings")
+# Pydantic models for the new endpoint
+class ListingItem(BaseModel):
+    id: str
+    status: str
+    address: str
+    location: str
+    sqft: int
+    garages: int
+    bedrooms: int
+    bathrooms: int
+    agent: str
+    listingAge: str
+    price: float
+    imageUrl: str
+
+class PaginatedListingsResponse(BaseModel):
+    results: List[ListingItem]
+    page: int
+    limit: int
+    total: int
+    has_more: bool
+
+@router.get("/", response_model=PaginatedListingsResponse)
+async def get_filtered_listings(
+    location: Optional[str] = Query(None, description="Filter by location (city)"),
+    bedrooms: Optional[int] = Query(None, ge=0, description="Filter by number of bedrooms"),
+    bathrooms: Optional[int] = Query(None, ge=0, description="Filter by number of bathrooms"),
+    status: Optional[str] = Query(None, description="Filter by status (For Sale or For Rent)"),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(30, ge=1, le=100, description="Number of records per page")
 ):
-    """Get all listings with optional filters"""
+    """Get filtered property listings with pagination support"""
     try:
+        # Calculate offset for pagination
+        offset = (page - 1) * limit
+        
+        # Build query
         query = supabase.client.table("listings").select("*")
         
         # Apply filters
-        if city:
-            query = query.eq("city", city)
-        if property_type:
-            query = query.eq("property_type", property_type)
-        if min_price is not None:
-            query = query.gte("price_per_night", min_price)
-        if max_price is not None:
-            query = query.lte("price_per_night", max_price)
-        if min_bedrooms is not None:
-            query = query.gte("bedrooms", min_bedrooms)
-        if max_bedrooms is not None:
-            query = query.lte("bedrooms", max_bedrooms)
-        if available_only:
-            query = query.eq("is_available", True)
-        if featured_only:
-            query = query.eq("is_featured", True)
+        if location:
+            query = query.eq("city", location)
+        if bedrooms is not None:
+            query = query.eq("bedrooms", bedrooms)
+        if bathrooms is not None:
+            query = query.eq("bathrooms", bathrooms)
+        if status:
+            # Map status to property_type since status field doesn't exist yet
+            if status.lower() == "for sale":
+                query = query.eq("property_type", "House")  # Assuming houses are for sale
+            elif status.lower() == "for rent":
+                query = query.eq("property_type", "Apartment")  # Assuming apartments are for rent
+        
+        # Get total count first
+        count_query = query
+        count_result = count_query.execute()
+        total = len(count_result.data) if count_result.data else 0
         
         # Apply pagination
-        query = query.range(skip, skip + limit - 1)
+        query = query.range(offset, offset + limit - 1)
         
+        # Execute query
         result = query.execute()
         
         if result.data:
-            return result.data
+            # Transform data to match required response format
+            listings = []
+            for item in result.data:
+                # Get listing age (use stored value if available, otherwise calculate)
+                listing_age_days = item.get("listing_age_days")
+                if listing_age_days is not None:
+                    listing_age_str = f"{listing_age_days} days ago" if listing_age_days > 0 else "Today"
+                else:
+                    try:
+                        created_date = datetime.fromisoformat(item.get("created_at", datetime.now().isoformat()))
+                        # Handle timezone-aware datetime
+                        if created_date.tzinfo is None:
+                            created_date = created_date.replace(tzinfo=None)
+                        current_time = datetime.now().replace(tzinfo=None)
+                        listing_age = (current_time - created_date).days
+                        listing_age_str = f"{listing_age} days ago" if listing_age > 0 else "Today"
+                    except Exception:
+                        listing_age_str = "Recently"
+                
+                # Get image URL (use stored value if available, otherwise get from images array)
+                image_url = item.get("image_url")
+                if not image_url:
+                    image_url = item.get("images", [""])[0] if item.get("images") else ""
+                
+                # Get status (use stored value if available, otherwise map from property_type)
+                listing_status = item.get("status")
+                if not listing_status:
+                    status_mapping = {
+                        "House": "For Sale",
+                        "Apartment": "For Rent",
+                        "Condo": "For Sale",
+                        "Townhouse": "For Sale"
+                    }
+                    listing_status = status_mapping.get(item.get("property_type", "House"), "For Sale")
+                
+                # Create location string
+                location_str = f"{item.get('city', '')}, {item.get('state', '')}"
+                
+                # Get agent name (use stored value if available, otherwise generate from host_id)
+                agent_name = item.get("agent_name")
+                if not agent_name:
+                    agent_name = f"Agent {item.get('host_id', '')[:8]}"
+                
+                listing_item = ListingItem(
+                    id=item.get("id", ""),
+                    status=listing_status,
+                    address=item.get("address", ""),
+                    location=location_str,
+                    sqft=item.get("square_feet", 0),
+                    garages=item.get("garages", 1),  # Use stored value or default
+                    bedrooms=item.get("bedrooms", 0),
+                    bathrooms=item.get("bathrooms", 0),
+                    agent=agent_name,
+                    listingAge=listing_age_str,
+                    price=float(item.get("price_per_night", 0)),
+                    imageUrl=image_url
+                )
+                listings.append(listing_item)
+            
+            # Calculate if there are more pages
+            has_more = (page * limit) < total
+            
+            return PaginatedListingsResponse(
+                results=listings,
+                page=page,
+                limit=limit,
+                total=total,
+                has_more=has_more
+            )
         else:
-            return []
+            return PaginatedListingsResponse(
+                results=[],
+                page=page,
+                limit=limit,
+                total=0,
+                has_more=False
+            )
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching listings: {str(e)}")
