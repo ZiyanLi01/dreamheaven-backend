@@ -65,13 +65,37 @@ class RealEstateDataGenerator:
         }
     
     def generate_listing(self, host_id: str) -> Dict[str, Any]:
-        """Generate a fake real estate listing"""
+        """Generate a fake real estate listing with enhanced schema"""
         city = random.choice(self.cities)
         property_type = random.choice(self.property_types)
         
+        # Determine property listing type based on property_type
+        if property_type in ["Apartment", "Studio"]:
+            property_listing_type = "rent"
+        elif property_type in ["House", "Condo", "Townhouse", "Villa", "Penthouse", "Duplex", "Cottage"]:
+            property_listing_type = "sale"
+        else:
+            property_listing_type = "sale"
+        
+        # Set some properties as both rent and sale (10% chance for eligible types)
+        if property_type in ["House", "Condo", "Townhouse"] and random.random() < 0.1:
+            property_listing_type = "both"
+        
         # Generate realistic pricing based on property type and location
         base_price = self._get_base_price(property_type, city["name"])
-        price = base_price + random.randint(-base_price//4, base_price//4)
+        price_per_night = base_price + random.randint(-base_price//4, base_price//4)
+        
+        # Calculate sale and rent prices
+        price_for_sale = None
+        price_per_month = None
+        
+        if property_listing_type in ["sale", "both"]:
+            # Convert nightly rate to annual sale price (30 nights * 12 months * multiplier)
+            price_for_sale = price_per_night * 30 * 12 * random.uniform(0.8, 1.2)
+        
+        if property_listing_type in ["rent", "both"]:
+            # Convert nightly rate to monthly rent (30 nights * multiplier)
+            price_per_month = price_per_night * 30 * random.uniform(0.9, 1.1)
         
         # Generate realistic bedrooms and bathrooms
         if property_type in ["Studio", "Loft"]:
@@ -86,6 +110,24 @@ class RealEstateDataGenerator:
         
         # Generate square footage
         sqft = self._get_square_footage(property_type, bedrooms)
+        
+        # Generate garage number based on property type and size
+        if property_type in ["House", "Villa"]:
+            garage_number = 2 if sqft > 2000 else 1
+        elif property_type in ["Condo", "Townhouse"]:
+            garage_number = 1
+        else:
+            garage_number = 0
+        
+        # Generate yard availability
+        has_yard = property_type in ["House", "Villa", "Cottage"] or (
+            property_type == "Townhouse" and random.random() < 0.7
+        )
+        
+        # Generate parking lot availability
+        has_parking_lot = property_type in ["Apartment", "Condo", "Studio"] or (
+            property_type in ["House", "Villa"] and random.random() < 0.3
+        )
         
         # Generate amenities
         num_amenities = random.randint(3, 8)
@@ -103,12 +145,14 @@ class RealEstateDataGenerator:
             "title": self._generate_title(property_type, city, bedrooms),
             "description": description,
             "property_type": property_type,
+            "property_listing_type": property_listing_type,
             "bedrooms": bedrooms,
             "bathrooms": bathrooms,
             "max_guests": bedrooms * 2 + 1,
             "square_feet": sqft,
-            "price_per_night": price,
-            "price_per_month": price * 30,
+            "price_per_night": price_per_night,
+            "price_per_month": price_per_month,
+            "price_for_sale": price_for_sale,
             "city": city["name"],
             "state": city["state"],
             "country": "United States",
@@ -116,6 +160,9 @@ class RealEstateDataGenerator:
             "longitude": city["lng"] + random.uniform(-0.1, 0.1),
             "address": self.fake.street_address(),
             "neighborhood": random.choice(self.neighborhoods),
+            "garage_number": garage_number,
+            "has_yard": has_yard,
+            "has_parking_lot": has_parking_lot,
             "amenities": listing_amenities,
             "images": images,
             "is_available": random.choice([True, True, True, False]),  # 75% available

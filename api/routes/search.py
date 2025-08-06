@@ -43,6 +43,186 @@ class SearchResponse(BaseModel):
     limit: int
     has_more: bool
 
+# Request model for POST search
+class SearchRequest(BaseModel):
+    location: Optional[str] = None
+    bed: Optional[str] = None
+    bath: Optional[str] = None
+    rent: Optional[str] = None
+    sortBy: Optional[str] = None
+    sortOrder: Optional[str] = "asc"
+    page: int = 1
+    limit: int = 30
+
+@router.post("/", response_model=SearchResponse)
+async def search_listings_post(search_request: SearchRequest):
+    """Search listings with POST request - handles frontend filter payload"""
+    try:
+        # Calculate offset for pagination
+        offset = (search_request.page - 1) * search_request.limit
+        
+        # Build query with only necessary fields for listing cards
+        query = supabase.client.table("listings").select(
+            "id, address, city, state, bedrooms, bathrooms, square_feet, price_per_night, price_per_month, price_for_sale, property_listing_type, images"
+        )
+        
+        # Apply location filter
+        if search_request.location:
+            # Split location into city and state (e.g., "Los Angeles, CA")
+            location_parts = search_request.location.split(',')
+            if len(location_parts) == 2:
+                city = location_parts[0].strip()
+                state = location_parts[1].strip()
+                query = query.eq("city", city).eq("state", state)
+            else:
+                # Fallback to just city if no comma found
+                query = query.eq("city", search_request.location.strip())
+        
+        # Apply bedrooms filter
+        if search_request.bed and search_request.bed != "Any":
+            if search_request.bed == "2+":
+                query = query.gte("bedrooms", 2)
+            else:
+                try:
+                    bed_count = int(search_request.bed)
+                    query = query.eq("bedrooms", bed_count)
+                except ValueError:
+                    # If parsing fails, skip this filter
+                    pass
+        
+        # Apply bathrooms filter
+        if search_request.bath and search_request.bath != "Any":
+            if search_request.bath == "2+":
+                query = query.gte("bathrooms", 2)
+            else:
+                try:
+                    bath_count = int(search_request.bath)
+                    query = query.eq("bathrooms", bath_count)
+                except ValueError:
+                    # If parsing fails, skip this filter
+                    pass
+        
+        # Apply rent filter
+        if search_request.rent:
+            if search_request.rent == "For Rent":
+                # Filter for properties that have monthly rent prices (not null)
+                query = query.not_.is_("price_per_month", "null")
+            elif search_request.rent == "For Sale":
+                # Filter for properties that have sale prices (not null)
+                query = query.not_.is_("price_for_sale", "null")
+        
+        # Apply sorting
+        if search_request.sortBy:
+            # Map frontend sort fields to database fields
+            sort_field_mapping = {
+                "price": "price_per_night",  # Default to nightly price for sorting
+                "bedrooms": "bedrooms",
+                "bathrooms": "bathrooms",
+                "square_feet": "square_feet"
+            }
+            
+            db_sort_field = sort_field_mapping.get(search_request.sortBy, "price_per_night")
+            sort_direction = "asc" if search_request.sortOrder and search_request.sortOrder.lower() == "asc" else "desc"
+            
+            if sort_direction == "asc":
+                query = query.order(db_sort_field, desc=False)
+            else:
+                query = query.order(db_sort_field, desc=True)
+        
+        # Get total count first
+        count_query = query
+        count_result = count_query.execute()
+        total = len(count_result.data) if count_result.data else 0
+        
+        # Apply pagination
+        query = query.range(offset, offset + search_request.limit - 1)
+        
+        # Execute query
+        result = query.execute()
+        
+        if result.data:
+            # Transform data to match required response format
+            listings = []
+            for item in result.data:
+                # Get first image from images array
+                image_url = item.get("images", [""])[0] if item.get("images") else ""
+                
+                # Get status based on property_listing_type
+                listing_type = item.get("property_listing_type", "sale")
+                if listing_type == "rent":
+                    listing_status = "For Rent"
+                elif listing_type == "sale":
+                    listing_status = "For Sale"
+                elif listing_type == "both":
+                    listing_status = "For Sale & Rent"
+                else:
+                    listing_status = "For Sale"
+                
+                # Create location string
+                location_str = f"{item.get('city', '')}, {item.get('state', '')}"
+                
+                # Determine price based on listing type
+                price_for_sale = item.get("price_for_sale")
+                price_per_month = item.get("price_per_month")
+                
+                # Use appropriate price for display
+                if listing_type == "rent" and price_per_month:
+                    display_price = price_per_month
+                elif listing_type == "sale" and price_for_sale:
+                    display_price = price_for_sale
+                elif listing_type == "both":
+                    # For both, show sale price as primary, rent as secondary
+                    display_price = price_for_sale if price_for_sale else price_per_month
+                else:
+                    # Fallback to old price_per_night
+                    display_price = float(item.get("price_per_night", 0))
+                
+                # Create SearchResult compatible with existing response model
+                search_result = SearchResult(
+                    id=item.get("id", ""),
+                    title=item.get("address", ""),  # Use address as title
+                    description=f"{item.get('bedrooms', 0)}BR, {item.get('bathrooms', 0)}BA - {listing_status}",
+                    property_type=listing_type,
+                    bedrooms=item.get("bedrooms", 0),
+                    bathrooms=item.get("bathrooms", 0),
+                    price_per_night=display_price,
+                    city=item.get("city", ""),
+                    state=item.get("state", ""),
+                    neighborhood="",  # Default empty
+                    amenities=[],  # Default empty
+                    images=[image_url] if image_url else [],
+                    rating=0.0,  # Default
+                    review_count=0,  # Default
+                    is_available=True,  # Default
+                    is_featured=False,  # Default
+                    latitude=0.0,  # Default
+                    longitude=0.0  # Default
+                )
+                listings.append(search_result)
+            
+            # Calculate if there are more pages
+            has_more = (search_request.page * search_request.limit) < total
+            
+            return SearchResponse(
+                results=listings,
+                total=total,
+                page=search_request.page,
+                limit=search_request.limit,
+                has_more=has_more
+            )
+        else:
+            return SearchResponse(
+                results=[],
+                total=0,
+                page=search_request.page,
+                limit=search_request.limit,
+                has_more=False
+            )
+            
+    except Exception as e:
+        print(f"❌ Error in search_listings_post: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
 @router.get("/", response_model=SearchResponse)
 async def search_listings(
     q: Optional[str] = Query(None, description="Search query"),

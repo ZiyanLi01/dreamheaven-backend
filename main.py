@@ -53,6 +53,27 @@ async def root():
 async def health_check():
     return {"status": "healthy", "service": "dream-haven-backend"}
 
+@app.get("/debug")
+async def debug_request():
+    """Debug endpoint to help identify frontend request issues"""
+    from datetime import datetime
+    from scripts.supabase_manager import SupabaseManager
+    
+    try:
+        # Test Supabase connection
+        supabase = SupabaseManager()
+        test_result = supabase.client.table("listings").select("id").limit(1).execute()
+        supabase_status = "connected" if test_result.data else "no_data"
+    except Exception as e:
+        supabase_status = f"error: {str(e)}"
+    
+    return {
+        "status": "debug_info",
+        "supabase_status": supabase_status,
+        "server_time": datetime.now().isoformat(),
+        "message": "Backend is running and ready to handle requests"
+    }
+
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
