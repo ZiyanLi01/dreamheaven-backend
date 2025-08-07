@@ -61,10 +61,8 @@ async def search_listings_post(search_request: SearchRequest):
         # Calculate offset for pagination
         offset = (search_request.page - 1) * search_request.limit
         
-        # Build query with only necessary fields for listing cards
-        query = supabase.client.table("listings").select(
-            "id, address, city, state, bedrooms, bathrooms, square_feet, price_per_night, price_per_month, price_for_sale, property_listing_type, images"
-        )
+        # Build query with ALL fields from the listings table
+        query = supabase.client.table("listings").select("*")
         
         # Apply location filter
         if search_request.location:
@@ -105,11 +103,11 @@ async def search_listings_post(search_request: SearchRequest):
         # Apply rent filter
         if search_request.rent:
             if search_request.rent == "For Rent":
-                # Filter for properties that have monthly rent prices (not null)
-                query = query.not_.is_("price_per_month", "null")
+                # Filter for properties with property_listing_type = 'rent' or 'both'
+                query = query.in_("property_listing_type", ["rent", "both"])
             elif search_request.rent == "For Sale":
-                # Filter for properties that have sale prices (not null)
-                query = query.not_.is_("price_for_sale", "null")
+                # Filter for properties with property_listing_type = 'sale' or 'both'
+                query = query.in_("property_listing_type", ["sale", "both"])
         
         # Apply sorting
         if search_request.sortBy:
@@ -141,66 +139,17 @@ async def search_listings_post(search_request: SearchRequest):
         result = query.execute()
         
         if result.data:
-            # Transform data to match required response format
+            # Transform data to return full listing objects
             listings_dict = {}
             for item in result.data:
-                # Get first image from images array
-                image_url = item.get("images", [""])[0] if item.get("images") else ""
-                
-                # Get status based on property_listing_type
-                listing_type = item.get("property_listing_type", "sale")
-                if listing_type == "rent":
-                    listing_status = "For Rent"
-                elif listing_type == "sale":
-                    listing_status = "For Sale"
-                elif listing_type == "both":
-                    listing_status = "For Sale & Rent"
-                else:
-                    listing_status = "For Sale"
-                
-                # Create location string
-                location_str = f"{item.get('city', '')}, {item.get('state', '')}"
-                
-                # Determine price based on listing type
-                price_for_sale = item.get("price_for_sale")
-                price_per_month = item.get("price_per_month")
-                
-                # Use appropriate price for display
-                if listing_type == "rent" and price_per_month:
-                    display_price = price_per_month
-                elif listing_type == "sale" and price_for_sale:
-                    display_price = price_for_sale
-                elif listing_type == "both":
-                    # For both, show sale price as primary, rent as secondary
-                    display_price = price_for_sale if price_for_sale else price_per_month
-                else:
-                    # Fallback to old price_per_night
-                    display_price = float(item.get("price_per_night", 0))
-                
-                # Create SearchResult compatible with existing response model
-                search_result = SearchResult(
-                    id=item.get("id", ""),
-                    title=item.get("address", ""),  # Use address as title
-                    description=f"{item.get('bedrooms', 0)}BR, {item.get('bathrooms', 0)}BA - {listing_status}",
-                    property_type=listing_type,
-                    bedrooms=item.get("bedrooms", 0),
-                    bathrooms=item.get("bathrooms", 0),
-                    price_per_night=display_price,
-                    city=item.get("city", ""),
-                    state=item.get("state", ""),
-                    neighborhood="",  # Default empty
-                    amenities=[],  # Default empty
-                    images=[image_url] if image_url else [],
-                    rating=0.0,  # Default
-                    review_count=0,  # Default
-                    is_available=True,  # Default
-                    is_featured=False,  # Default
-                    latitude=0.0,  # Default
-                    longitude=0.0  # Default
-                )
+                # Return the full listing object as-is from the database
+                # This includes all fields: id, title, description, property_type, property_listing_type,
+                # bedrooms, bathrooms, square_feet, garage_number, price_per_night, price_per_month, price_for_sale,
+                # city, state, country, latitude, longitude, address, neighborhood,
+                # has_yard, has_parking_lot, amenities, images, is_available, is_featured, rating, review_count
                 
                 # Use the listing ID as the key in the dictionary
-                listings_dict[item.get("id", "")] = search_result.dict()
+                listings_dict[item.get("id", "")] = item
             
             # Calculate if there are more pages
             has_more = (search_request.page * search_request.limit) < total

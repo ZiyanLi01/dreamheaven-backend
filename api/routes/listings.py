@@ -128,11 +128,9 @@ async def get_filtered_listings(
         # Calculate offset for pagination
         offset = (page - 1) * limit
         
-        # Build query with only necessary fields for listing cards
+        # Build query with ALL fields from the listings table
         try:
-            query = supabase.client.table("listings").select(
-                "id, address, city, state, bedrooms, bathrooms, square_feet, price_per_night, price_per_month, price_for_sale, property_listing_type, images"
-            )
+            query = supabase.client.table("listings").select("*")
             print(f"✅ Query built successfully with filters: location={location}, bed={bed}, bath={bath}, rent={rent}, sortBy={sortBy}, sortOrder={sortOrder}")
         except Exception as e:
             print(f"❌ Error building query: {str(e)}")
@@ -177,11 +175,11 @@ async def get_filtered_listings(
         # Apply rent filter
         if rent:
             if rent == "For Rent":
-                # Filter for properties that have monthly rent prices (not null)
-                query = query.not_.is_("price_per_month", "null")
+                # Filter for properties with property_listing_type = 'rent' or 'both'
+                query = query.in_("property_listing_type", ["rent", "both"])
             elif rent == "For Sale":
-                # Filter for properties that have sale prices (not null)
-                query = query.not_.is_("price_for_sale", "null")
+                # Filter for properties with property_listing_type = 'sale' or 'both'
+                query = query.in_("property_listing_type", ["sale", "both"])
         
         # Apply sorting
         if sortBy:
@@ -223,65 +221,17 @@ async def get_filtered_listings(
             raise HTTPException(status_code=500, detail=f"Error fetching results: {str(e)}")
         
         if result.data:
-            # Transform data to match required response format
+            # Transform data to return full listing objects
             listings_dict = {}
             for item in result.data:
-                # Get first image from images array
-                image_url = item.get("images", [""])[0] if item.get("images") else ""
-                
-                # Get status based on property_listing_type
-                listing_type = item.get("property_listing_type", "sale")
-                if listing_type == "rent":
-                    listing_status = "For Rent"
-                elif listing_type == "sale":
-                    listing_status = "For Sale"
-                elif listing_type == "both":
-                    listing_status = "For Sale & Rent"
-                else:
-                    listing_status = "For Sale"
-                
-                # Create location string
-                location_str = f"{item.get('city', '')}, {item.get('state', '')}"
-                
-                # Determine price based on listing type
-                price_for_sale = item.get("price_for_sale")
-                price_per_month = item.get("price_per_month")
-                
-                # Use appropriate price for display
-                if listing_type == "rent" and price_per_month:
-                    display_price = price_per_month
-                elif listing_type == "sale" and price_for_sale:
-                    display_price = price_for_sale
-                elif listing_type == "both":
-                    # For both, show sale price as primary, rent as secondary
-                    display_price = price_for_sale if price_for_sale else price_per_month
-                else:
-                    # Fallback to old price_per_night
-                    display_price = float(item.get("price_per_night", 0))
-                
-                listing_item = ListingItem(
-                    id=item.get("id", ""),
-                    status=listing_status,
-                    address=item.get("address", ""),
-                    location=location_str,
-                    sqft=item.get("square_feet", 0),
-                    garages=1,  # Default value since we're not selecting garage_number
-                    bedrooms=item.get("bedrooms", 0),
-                    bathrooms=item.get("bathrooms", 0),
-                    agent="Agent",  # Default value since we're not selecting agent info
-                    listingAge="Recently",  # Default value since we're not selecting created_at
-                    price=display_price,
-                    imageUrl=image_url,
-                    # New fields
-                    listing_type=listing_type,
-                    price_for_sale=price_for_sale,
-                    price_per_month=price_per_month,
-                    has_yard=False,  # Default value since we're not selecting these fields
-                    has_parking_lot=False
-                )
+                # Return the full listing object as-is from the database
+                # This includes all fields: id, title, description, property_type, property_listing_type,
+                # bedrooms, bathrooms, square_feet, garage_number, price_per_night, price_per_month, price_for_sale,
+                # city, state, country, latitude, longitude, address, neighborhood,
+                # has_yard, has_parking_lot, amenities, images, is_available, is_featured, rating, review_count
                 
                 # Use the listing ID as the key in the dictionary
-                listings_dict[item.get("id", "")] = listing_item.dict()
+                listings_dict[item.get("id", "")] = item
             
             # Calculate if there are more pages
             has_more = (page * limit) < total
