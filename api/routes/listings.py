@@ -102,7 +102,7 @@ class ListingItem(BaseModel):
     has_parking_lot: bool = False
 
 class PaginatedListingsResponse(BaseModel):
-    results: List[ListingItem]
+    results: dict  # Changed from List[ListingItem] to dict with UUID keys
     page: int
     limit: int
     total: int
@@ -224,7 +224,7 @@ async def get_filtered_listings(
         
         if result.data:
             # Transform data to match required response format
-            listings = []
+            listings_dict = {}
             for item in result.data:
                 # Get first image from images array
                 image_url = item.get("images", [""])[0] if item.get("images") else ""
@@ -279,13 +279,15 @@ async def get_filtered_listings(
                     has_yard=False,  # Default value since we're not selecting these fields
                     has_parking_lot=False
                 )
-                listings.append(listing_item)
+                
+                # Use the listing ID as the key in the dictionary
+                listings_dict[item.get("id", "")] = listing_item.dict()
             
             # Calculate if there are more pages
             has_more = (page * limit) < total
             
             return PaginatedListingsResponse(
-                results=listings,
+                results=listings_dict,
                 page=page,
                 limit=limit,
                 total=total,
@@ -293,7 +295,7 @@ async def get_filtered_listings(
             )
         else:
             return PaginatedListingsResponse(
-                results=[],
+                results={},
                 page=page,
                 limit=limit,
                 total=0,

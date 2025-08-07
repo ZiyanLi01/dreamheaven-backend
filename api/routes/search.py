@@ -37,7 +37,7 @@ class SearchResult(BaseModel):
     longitude: float
 
 class SearchResponse(BaseModel):
-    results: List[SearchResult]
+    results: dict  # Changed from List[SearchResult] to dict with UUID keys
     total: int
     page: int
     limit: int
@@ -142,7 +142,7 @@ async def search_listings_post(search_request: SearchRequest):
         
         if result.data:
             # Transform data to match required response format
-            listings = []
+            listings_dict = {}
             for item in result.data:
                 # Get first image from images array
                 image_url = item.get("images", [""])[0] if item.get("images") else ""
@@ -198,13 +198,15 @@ async def search_listings_post(search_request: SearchRequest):
                     latitude=0.0,  # Default
                     longitude=0.0  # Default
                 )
-                listings.append(search_result)
+                
+                # Use the listing ID as the key in the dictionary
+                listings_dict[item.get("id", "")] = search_result.dict()
             
             # Calculate if there are more pages
             has_more = (search_request.page * search_request.limit) < total
             
             return SearchResponse(
-                results=listings,
+                results=listings_dict,
                 total=total,
                 page=search_request.page,
                 limit=search_request.limit,
@@ -212,7 +214,7 @@ async def search_listings_post(search_request: SearchRequest):
             )
         else:
             return SearchResponse(
-                results=[],
+                results={},
                 total=0,
                 page=search_request.page,
                 limit=search_request.limit,
@@ -307,11 +309,16 @@ async def search_listings(
                         filtered_listings.append(listing)
             listings = filtered_listings
         
+        # Transform to dictionary format
+        listings_dict = {}
+        for listing in listings:
+            listings_dict[listing.get("id", "")] = listing
+        
         # Calculate if there are more results
         has_more = (offset + limit) < total
         
         return SearchResponse(
-            results=listings,
+            results=listings_dict,
             total=total,
             page=page,
             limit=limit,
