@@ -78,8 +78,14 @@ async def search_listings_post(search_request: SearchRequest):
         
         # Apply bedrooms filter
         if search_request.bed and search_request.bed != "Any":
-            if search_request.bed == "2+":
-                query = query.gte("bedrooms", 2)
+            if search_request.bed.endswith("+"):
+                # Handle patterns like "2+", "5+", etc.
+                try:
+                    min_beds = int(search_request.bed[:-1])  # Remove the "+" and convert to int
+                    query = query.gte("bedrooms", min_beds)
+                except ValueError:
+                    # If parsing fails, skip this filter
+                    pass
             else:
                 try:
                     bed_count = int(search_request.bed)
@@ -90,8 +96,14 @@ async def search_listings_post(search_request: SearchRequest):
         
         # Apply bathrooms filter
         if search_request.bath and search_request.bath != "Any":
-            if search_request.bath == "2+":
-                query = query.gte("bathrooms", 2)
+            if search_request.bath.endswith("+"):
+                # Handle patterns like "2+", "5+", etc.
+                try:
+                    min_baths = int(search_request.bath[:-1])  # Remove the "+" and convert to int
+                    query = query.gte("bathrooms", min_baths)
+                except ValueError:
+                    # If parsing fails, skip this filter
+                    pass
             else:
                 try:
                     bath_count = int(search_request.bath)
@@ -127,16 +139,13 @@ async def search_listings_post(search_request: SearchRequest):
             else:
                 query = query.order(db_sort_field, desc=True)
         
-        # Get total count first
-        count_query = query
-        count_result = count_query.execute()
+        # Get total count first by executing the filtered query without pagination
+        count_result = query.execute()
         total = len(count_result.data) if count_result.data else 0
         
-        # Apply pagination
-        query = query.range(offset, offset + search_request.limit - 1)
-        
-        # Execute query
-        result = query.execute()
+        # Now apply pagination and execute again for the actual results
+        paginated_query = query.range(offset, offset + search_request.limit - 1)
+        result = paginated_query.execute()
         
         if result.data:
             # Transform data to return full listing objects
@@ -191,7 +200,7 @@ async def search_listings(
     sort_by: str = Query("created_at", description="Sort by field (price_per_night, rating, created_at)"),
     sort_order: str = Query("desc", description="Sort order (asc, desc)"),
     page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(20, ge=1, le=100, description="Number of results per page")
+    limit: int = Query(30, ge=1, le=100, description="Number of results per page")
 ):
     """Search listings with various filters and sorting options"""
     try:
@@ -234,16 +243,13 @@ async def search_listings(
         else:
             query = query.order(sort_by, desc=True)
         
-        # Get total count first
-        count_query = query
-        count_result = count_query.execute()
+        # Get total count first by executing the filtered query without pagination
+        count_result = query.execute()
         total = len(count_result.data) if count_result.data else 0
         
-        # Apply pagination
-        query = query.range(offset, offset + limit - 1)
-        
-        # Execute query
-        result = query.execute()
+        # Now apply pagination and execute again for the actual results
+        paginated_query = query.range(offset, offset + limit - 1)
+        result = paginated_query.execute()
         
         listings = result.data if result.data else []
         
@@ -282,7 +288,7 @@ async def search_nearby(
     latitude: float = Query(..., description="Latitude"),
     longitude: float = Query(..., description="Longitude"),
     radius_km: float = Query(10.0, ge=0.1, le=100.0, description="Search radius in kilometers"),
-    limit: int = Query(20, ge=1, le=100, description="Number of results")
+    limit: int = Query(30, ge=1, le=100, description="Number of results")
 ):
     """Search for listings near a specific location"""
     try:
