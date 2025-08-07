@@ -258,13 +258,17 @@ async def get_filtered_listings(
         # Return 500 error with detailed message
         raise HTTPException(status_code=500, detail=f"Error fetching listings: {str(e)}")
 
-@router.get("/{listing_id}", response_model=ListingResponse)
+@router.get("/{listing_id}")
 async def get_listing(listing_id: str):
-    """Get a specific listing by ID"""
+    """Get a specific listing by ID - returns full listing object with all fields"""
     try:
+        if supabase is None:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         result = supabase.client.table("listings").select("*").eq("id", listing_id).execute()
         
         if result.data:
+            # Return the full listing object as-is from the database
             return result.data[0]
         else:
             raise HTTPException(status_code=404, detail="Listing not found")
@@ -272,6 +276,7 @@ async def get_listing(listing_id: str):
     except HTTPException:
         raise
     except Exception as e:
+        print(f"❌ Error in get_listing: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching listing: {str(e)}")
 
 @router.post("/", response_model=ListingResponse)
