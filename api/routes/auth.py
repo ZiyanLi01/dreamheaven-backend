@@ -84,7 +84,8 @@ async def register(buyer_data: BuyerRegister):
                     "first_name": buyer_data.first_name,
                     "last_name": buyer_data.last_name,
                     "user_type": "buyer"
-                }
+                },
+                "email_confirm": True  # Enable email confirmation
             }
         })
         
@@ -106,17 +107,37 @@ async def register(buyer_data: BuyerRegister):
             buyer_result = supabase.client.table("buyers").insert(buyer_profile_data).execute()
             buyer_profile = buyer_result.data[0] if buyer_result.data else buyer_profile_data
             
-            return AuthResponse(
-                access_token=auth_response.session.access_token,
-                refresh_token=auth_response.session.refresh_token,
-                user=buyer_profile,
-                expires_in=auth_response.session.expires_in
-            )
+            # Check if session exists (email confirmation might be required)
+            if auth_response.session:
+                return AuthResponse(
+                    access_token=auth_response.session.access_token,
+                    refresh_token=auth_response.session.refresh_token,
+                    user=buyer_profile,
+                    expires_in=auth_response.session.expires_in
+                )
+            else:
+                # Email confirmation required - return success without tokens
+                return {
+                    "message": "Registration successful! Please check your email to confirm your account.",
+                    "user": buyer_profile,
+                    "email_confirmation_required": True,
+                    "access_token": None,
+                    "refresh_token": None,
+                    "expires_in": None
+                }
         else:
             raise HTTPException(status_code=400, detail="Failed to create user")
             
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Registration failed: {str(e)}")
+        print(f"Registration error details: {str(e)}")
+        # Provide more specific error messages
+        error_msg = str(e)
+        if "invalid" in error_msg.lower():
+            raise HTTPException(status_code=400, detail="Invalid email format or email verification is required. Please use a valid email address.")
+        elif "already" in error_msg.lower():
+            raise HTTPException(status_code=400, detail="Email already registered. Please use a different email or try logging in.")
+        else:
+            raise HTTPException(status_code=400, detail=f"Registration failed: {error_msg}")
 
 @router.post("/logout")
 async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -244,4 +265,22 @@ async def resend_verification_email(email: EmailStr):
         return {"message": "Verification email sent"}
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to send verification email: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to send verification email: {str(e)}")
+
+@router.get("/test-config")
+async def test_auth_config():
+    """Test authentication configuration"""
+    try:
+        # Test basic Supabase connection
+        return {
+            "message": "Auth configuration test",
+            "supabase_url": supabase.client.supabase_url,
+            "status": "connected"
+        }
+    except Exception as e:
+        return {
+            "message": "Auth configuration error",
+            "error": str(e)
+        }
+
+ 
