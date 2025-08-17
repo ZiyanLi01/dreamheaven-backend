@@ -1,8 +1,14 @@
 from faker import Faker
 import random
+import os
+import requests
 from typing import List, Dict, Any
 import json
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 class RealEstateDataGenerator:
     """Generate realistic real estate data for Dream Haven"""
@@ -173,6 +179,185 @@ class RealEstateDataGenerator:
             "updated_at": datetime.now().isoformat()
         }
     
+    def generate_listing_v2(self, host_id: str) -> Dict[str, Any]:
+        """Generate a fake real estate listing for listings_v2 schema (enhanced)"""
+        city = random.choice(self.cities)
+        property_type = random.choice(self.property_types)
+        
+        # Determine property listing type based on property_type
+        if property_type in ["Apartment", "Studio"]:
+            property_listing_type = "rent"
+        elif property_type in ["House", "Condo", "Townhouse", "Villa", "Penthouse", "Duplex", "Cottage"]:
+            property_listing_type = "sale"
+        else:
+            property_listing_type = "sale"
+        
+        # Set some properties as both rent and sale (10% chance for eligible types)
+        if property_type in ["House", "Condo", "Townhouse"] and random.random() < 0.1:
+            property_listing_type = "both"
+        
+        # Generate realistic pricing based on property type and location
+        base_price = self._get_base_price(property_type, city["name"])
+        price_per_night = base_price + random.randint(-base_price//4, base_price//4)
+        
+        # Calculate sale and rent prices
+        price_for_sale = None
+        price_per_month = None
+        
+        if property_listing_type in ["sale", "both"]:
+            # Convert nightly rate to annual sale price (30 nights * 12 months * multiplier)
+            price_for_sale = int(price_per_night * 30 * 12 * random.uniform(0.8, 1.2))
+        
+        if property_listing_type in ["rent", "both"]:
+            # Convert nightly rate to monthly rent (30 nights * multiplier)
+            price_per_month = int(price_per_night * 30 * random.uniform(0.9, 1.1))
+        
+        # Generate realistic bedrooms and bathrooms
+        if property_type in ["Studio", "Loft"]:
+            bedrooms = 0
+            bathrooms = random.randint(1, 2)
+        elif property_type in ["Penthouse", "Villa", "House"]:
+            bedrooms = random.randint(2, 5)
+            bathrooms = random.randint(2, 4)
+        else:
+            bedrooms = random.randint(1, 3)
+            bathrooms = random.randint(1, 3)
+        
+        # Generate square footage
+        sqft = self._get_square_footage(property_type, bedrooms)
+        
+        # Generate garage number based on property type and size
+        if property_type in ["House", "Villa"]:
+            garage_number = 2 if sqft > 2000 else 1
+        elif property_type in ["Condo", "Townhouse"]:
+            garage_number = 1
+        else:
+            garage_number = 0
+        
+        # Generate yard availability
+        has_yard = property_type in ["House", "Villa", "Cottage"] or (
+            property_type == "Townhouse" and random.random() < 0.7
+        )
+        
+        # Generate parking lot availability
+        has_parking_lot = property_type in ["Apartment", "Condo", "Studio"] or (
+            property_type in ["House", "Villa"] and random.random() < 0.3
+        )
+        
+        # Generate amenities
+        num_amenities = random.randint(3, 8)
+        listing_amenities = random.sample(self.amenities, num_amenities)
+        
+        # Generate additional v2 fields first (before description generation)
+        floor = random.randint(1, 25) if property_type in ["Apartment", "Condo", "Penthouse"] and random.random() > 0.3 else None
+        year_built = random.randint(1900, 2023) if random.random() > 0.2 else None
+        year_renovated = random.randint(2010, 2023) if random.random() > 0.4 else None
+        school_rating = random.randint(6, 10) if random.random() > 0.3 else None
+        crime_index = round(random.uniform(20, 80), 1) if random.random() > 0.3 else None
+        facing = random.choice(["N", "NE", "E", "SE", "S", "SW", "W", "NW"]) if random.random() > 0.4 else None
+        shopping_idx = round(random.uniform(60, 95), 1) if random.random() > 0.3 else None
+        grocery_idx = round(random.uniform(70, 98), 1) if random.random() > 0.3 else None
+        
+        # Generate tags
+        tag_options = ["Downtown", "Historic", "Modern", "Luxury", "Pet Friendly", "Public Transit", 
+                      "Walkable", "Tech Hub", "Cultural District", "Waterfront", "Mountain View", 
+                      "City View", "Garden", "Pool", "Gym", "Parking", "Balcony", "Storage"]
+        tags = random.sample(tag_options, random.randint(2, 5)) if random.random() > 0.2 else None
+        
+        # Generate description using ChatGPT API with all available property details
+        description = self._generate_description(
+            property_type=property_type,
+            city=city,
+            bedrooms=bedrooms,
+            bathrooms=bathrooms,
+            amenities=listing_amenities,
+            square_feet=sqft,
+            year_built=year_built,
+            year_renovated=year_renovated,
+            facing=facing,
+            school_rating=school_rating,
+            crime_index=crime_index,
+            shopping_idx=shopping_idx,
+            grocery_idx=grocery_idx,
+            tags=tags
+        )
+        
+        # Generate images (initially empty for v2 - will be filled later)
+        images = None
+        
+        # Generate title using the existing method
+        title = self._generate_title(property_type, city["name"], bedrooms)
+        
+        # Generate embedding text
+        embedding_text = f"{property_type} in {city['name']} with {bedrooms} bedrooms and {bathrooms} bathrooms"
+        if listing_amenities:
+            embedding_text += f" featuring {', '.join(random.sample(listing_amenities, min(3, len(listing_amenities))))}"
+        
+        return {
+            "id": self.fake.uuid4(),
+            "host_id": host_id,
+            
+            # Property classification
+            "property_type": property_type,
+            "property_listing_type": property_listing_type,
+            
+            # Basic property information (relaxed validation)
+            "title": title,
+            "description": description,
+            "images": images,
+            
+            # Property specifications
+            "bedrooms": bedrooms,
+            "bathrooms": bathrooms,
+            "square_feet": sqft,
+            
+            # Pricing (separate fields for rent and sale)
+            "price_per_month": price_per_month,
+            "price_for_sale": price_for_sale,
+            
+            # Location information
+            "city": city["name"],
+            "state": city["state"],
+            "country": "United States",
+            "latitude": city["lat"] + random.uniform(-0.1, 0.1),
+            "longitude": city["lng"] + random.uniform(-0.1, 0.1),
+            "address": self.fake.street_address(),
+            "neighborhood": random.choice(self.neighborhoods),
+            
+            # Property features
+            "garage_number": garage_number,
+            "has_yard": has_yard,
+            "has_parking_lot": has_parking_lot,
+            "amenities": listing_amenities,
+            
+            # Property status
+            "is_available": random.choice([True, True, True, False]),  # 75% available
+            "is_featured": random.choice([True, False]),
+            
+            # Ratings and reviews
+            "rating": round(random.uniform(3.5, 5.0), 1),
+            "review_count": random.randint(5, 150),
+            
+            # Additional property details
+            "floor": floor,
+            "year_built": year_built,
+            "year_renovated": year_renovated,
+            "school_rating": school_rating,
+            "crime_index": crime_index,
+            "facing": facing,
+            "shopping_idx": shopping_idx,
+            "grocery_idx": grocery_idx,
+            "tags": tags,
+            
+            # AI/ML fields
+            "embedding_text": embedding_text,
+            "embedding": None,  # Will be generated later if needed
+            
+            # Timestamps
+            "created_at": self.fake.date_time_between(start_date="-1y", end_date="now").isoformat(),
+            "updated_at": datetime.now().isoformat()
+        }
+    
     def _get_base_price(self, property_type: str, city: str) -> int:
         """Get base price based on property type and city"""
         city_multipliers = {
@@ -239,30 +424,122 @@ class RealEstateDataGenerator:
         else:
             return f"{adj} {bedrooms}-Bedroom {property_type} in {loc} {city}"
     
-    def _generate_description(self, property_type: str, city: str, bedrooms: int, bathrooms: int, amenities: List[str]) -> str:
-        """Generate a detailed property description"""
-        descriptions = [
-            f"Welcome to this stunning {property_type.lower()} in the heart of {city['name']}! ",
-            f"Experience luxury living in this beautiful {property_type.lower()} located in {city['name']}. ",
-            f"Discover your perfect home in this charming {property_type.lower()} in {city['name']}. ",
-            f"This exceptional {property_type.lower()} offers the best of {city['name']} living. "
-        ]
+    def _generate_description(self, property_type: str, city: str, bedrooms: int, bathrooms: int, 
+                            amenities: List[str], **kwargs) -> str:
+        """Generate a detailed property description using ChatGPT API"""
         
-        desc = random.choice(descriptions)
+        # Check if OpenAI API key is available
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        if not openai_api_key:
+            # Return empty string if no API key
+            return ""
         
-        if bedrooms > 0:
-            desc += f"Featuring {bedrooms} spacious bedroom{'s' if bedrooms > 1 else ''} and {bathrooms} modern bathroom{'s' if bathrooms > 1 else ''}. "
-        else:
-            desc += f"Featuring {bathrooms} modern bathroom{'s' if bathrooms > 1 else ''}. "
-        
-        # Add amenities
-        if amenities:
-            amenity_text = ", ".join(amenities[:5])  # Limit to first 5 amenities
-            desc += f"This property includes {amenity_text}. "
-        
-        desc += "Perfect for both short-term stays and long-term rentals. Don't miss this opportunity to experience the best of what this vibrant city has to offer!"
-        
-        return desc
+        try:
+            # Extract optional parameters from kwargs with default values
+            square_feet = kwargs.get('square_feet')
+            year_built = kwargs.get('year_built')
+            year_renovated = kwargs.get('year_renovated')
+            facing = kwargs.get('facing')
+            school_rating = kwargs.get('school_rating')
+            crime_index = kwargs.get('crime_index')
+            shopping_idx = kwargs.get('shopping_idx')
+            grocery_idx = kwargs.get('grocery_idx')
+            tags = kwargs.get('tags', [])
+            
+            # Ensure all variables are defined
+            if not isinstance(tags, list):
+                tags = []
+            
+            # Prepare the prompt with all available property details
+            property_details = {
+                "property_type": property_type,
+                "city": city["name"],
+                "state": city["state"],
+                "bedrooms": bedrooms,
+                "bathrooms": bathrooms,
+                "square_feet": square_feet,
+                "year_built": year_built,
+                "year_renovated": year_renovated,
+                "facing": facing,
+                "amenities": amenities[:5] if amenities else [],  # Limit to 5 amenities
+                "school_rating": school_rating,
+                "crime_index": crime_index,
+                "shopping_idx": shopping_idx,
+                "grocery_idx": grocery_idx,
+                "tags": tags[:3] if tags else []  # Limit to 3 tags
+            }
+            
+            # Create the user prompt with property details
+            user_prompt = f"""
+                Generate a property description for:
+                - Property Type: {property_details['property_type']}
+                - Location: {property_details['city']}, {property_details['state']}
+                - Bedrooms: {property_details['bedrooms']}
+                - Bathrooms: {property_details['bathrooms']}
+                - Square Feet: {property_details['square_feet']}
+                - Year Built: {property_details['year_built']}
+                - Year Renovated: {property_details['year_renovated']}
+                - Facing: {property_details['facing']}
+                - Amenities: {', '.join(property_details['amenities'])}
+                - School Rating: {property_details['school_rating']}/10
+                - Crime Index: {property_details['crime_index']}/100
+                - Shopping Index: {property_details['shopping_idx']}/100
+                - Grocery Index: {property_details['grocery_idx']}/100
+                - Tags: {', '.join(property_details['tags'])}
+                """
+            
+            # Prepare the API request
+            headers = {
+                "Authorization": f"Bearer {openai_api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            data = {
+                "model": "gpt-4o-mini",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": """You are a real estate description generator.
+Your task is to produce ONE property description in natural English.
+Requirements:
+- Maximum length: 200 words
+- Marketing-friendly but factual
+- Avoid exaggeration; keep concise and factual.
+- Randomly choose a writing tone yourself (do not generate multiple versions)
+- Seamlessly use the structured fields provided (sqft, renovated_year, facing, distance_to_metro, pet_friendly, etc.)
+- If relevant, mention: safety, school quality, quietness, coffee density, grocery density, natural light, commuting convenience
+- Return ONLY the description body. No lists, no headings, no explanations, no JSON."""
+                    },
+                    {
+                        "role": "user",
+                        "content": user_prompt
+                    }
+                ],
+                "max_tokens": 300,
+                "temperature": 0.7
+            }
+            
+            # Make the API call
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                json=data,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                description = result["choices"][0]["message"]["content"].strip()
+                return description
+            else:
+                print(f"  ChatGPT API error: {response.status_code} - {response.text}")
+                return ""
+                
+        except Exception as e:
+            print(f"  Error calling ChatGPT API: {str(e)}")
+            return ""
+    
+
     
     def _generate_images(self, property_type: str) -> List[str]:
         """Generate realistic image URLs"""
@@ -289,4 +566,14 @@ class RealEstateDataGenerator:
         for _ in range(count):
             host_id = random.choice(host_ids)
             listings.append(self.generate_listing(host_id))
+        return listings
+    
+    def generate_listings_v2(self, host_ids: List[str], count: int) -> List[Dict[str, Any]]:
+        """Generate multiple listings for listings_v2 schema"""
+        listings = []
+        for i in range(count):
+            host_id = random.choice(host_ids)
+            listing = self.generate_listing_v2(host_id)
+            listings.append(listing)
+            print(f"✅ Generated listing_v2 {i+1}/{count}: {listing.get('title', 'Untitled')}")
         return listings 
