@@ -113,8 +113,7 @@ def main():
     print("\n🎉 All tests completed!")
     print("\n📝 To run these tests, make sure:")
     print("   1. The backend server is running (python main.py)")
-    print("   2. The database migration has been applied (python scripts/run_migration.py)")
-    print("   3. There is sample data in the database")
+    print("   2. There is sample data in the database")
 
 if __name__ == "__main__":
     main() 
