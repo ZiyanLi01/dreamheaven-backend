@@ -258,11 +258,8 @@ class RealEstateDataGenerator:
         shopping_idx = round(random.uniform(60, 95), 1) if random.random() > 0.3 else None
         grocery_idx = round(random.uniform(70, 98), 1) if random.random() > 0.3 else None
         
-        # Generate tags
-        tag_options = ["Downtown", "Historic", "Modern", "Luxury", "Pet Friendly", "Public Transit", 
-                      "Walkable", "Tech Hub", "Cultural District", "Waterfront", "Mountain View", 
-                      "City View", "Garden", "Pool", "Gym", "Parking", "Balcony", "Storage"]
-        tags = random.sample(tag_options, random.randint(2, 5)) if random.random() > 0.2 else None
+        # Generate tags (initially empty - will be populated by ETL #1)
+        tags = None
         
         # Generate description using ChatGPT API with all available property details
         description = self._generate_description(
@@ -288,10 +285,8 @@ class RealEstateDataGenerator:
         # Generate title using the existing method
         title = self._generate_title(property_type, city["name"], bedrooms)
         
-        # Generate embedding text
-        embedding_text = f"{property_type} in {city['name']} with {bedrooms} bedrooms and {bathrooms} bathrooms"
-        if listing_amenities:
-            embedding_text += f" featuring {', '.join(random.sample(listing_amenities, min(3, len(listing_amenities))))}"
+        # Generate embedding text (initially empty - will be populated by ETL #2)
+        embedding_text = ""
         
         return {
             "id": self.fake.uuid4(),
