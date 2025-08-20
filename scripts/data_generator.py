@@ -537,19 +537,9 @@ Requirements:
 
     
     def _generate_images(self, property_type: str) -> List[str]:
-        """Generate realistic image URLs"""
-        num_images = random.randint(3, 8)
-        images = []
-        
-        for i in range(num_images):
-            # Use Lorem Picsum for reliable demo images
-            width = random.choice([800, 1200, 1600])
-            height = random.choice([600, 800, 1200])
-            # Generate a random ID for consistent images
-            image_id = random.randint(1, 1000)
-            images.append(f"https://picsum.photos/{width}/{height}?random={image_id}")
-        
-        return images
+        """Generate empty images - will be populated later with unique Unsplash images"""
+        # Return empty list - images will be populated separately via upgrade_images.py
+        return []
     
     def generate_hosts(self, count: int) -> List[Dict[str, Any]]:
         """Generate multiple hosts"""

@@ -10,6 +10,7 @@ import sys
 import os
 import json
 import requests
+import random
 from typing import List, Dict, Any
 
 # Add the parent directory to the path
@@ -144,10 +145,10 @@ class ListingImageUpdater:
         
         return selected_images
     
-    def update_listing_images(self, listing_id: str, images: List[str]) -> bool:
+    def update_listing_images(self, listing_id: str, images: List[str], table_name: str = "listings") -> bool:
         """Update a single listing with new images"""
         try:
-            result = self.supabase.client.table("listings").update({
+            result = self.supabase.client.table(table_name).update({
                 "images": images
             }).eq("id", listing_id).execute()
             
@@ -157,9 +158,9 @@ class ListingImageUpdater:
             print(f"❌ Error updating listing {listing_id}: {e}")
             return False
     
-    def update_all_listings(self, image_urls: List[str]):
+    def update_all_listings(self, image_urls: List[str], table_name: str = "listings", images_per_listing: int = 1):
         """Update all listings with high-quality images"""
-        print("🖼️  Updating listings with high-quality images...")
+        print(f"🖼️  Updating {table_name} with high-quality images...")
         
         try:
             # Get all listings with pagination to handle 2000+ records
@@ -168,7 +169,7 @@ class ListingImageUpdater:
             page_size = 1000
             
             while True:
-                result = self.supabase.client.table("listings").select("id").range(page * page_size, (page + 1) * page_size - 1).execute()
+                result = self.supabase.client.table(table_name).select("id, title").range(page * page_size, (page + 1) * page_size - 1).execute()
                 
                 if not result.data:
                     break
@@ -181,30 +182,53 @@ class ListingImageUpdater:
                     break
             
             if not all_listings:
-                print("❌ No listings found")
+                print(f"❌ No listings found in {table_name}")
                 return
             
             total_listings = len(all_listings)
             print(f"📊 Found {total_listings} listings to update")
             
-            # Update each listing with new images
+            # Ensure we have enough unique images
+            if len(image_urls) < total_listings:
+                print(f"⚠️  Warning: Only {len(image_urls)} images available for {total_listings} listings")
+                print("   Some listings may get duplicate images")
+            
+            # Update each listing with unique images
             updated_count = 0
             failed_count = 0
+            used_images = set()  # Track used images to minimize duplicates
             
             for i, listing in enumerate(all_listings, 1):
-                # Generate 3-8 images for each listing
-                num_images = 3 + (i % 6)  # Vary between 3-8 images
-                new_images = self.generate_listing_images(image_urls, num_images)
+                listing_id = listing["id"]
+                title = listing.get("title", "Untitled")
                 
-                if self.update_listing_images(listing["id"], new_images):
+                # Generate unique images for this listing
+                if images_per_listing == 1:
+                    # For single image, try to use unused images first
+                    available_images = [img for img in image_urls if img not in used_images]
+                    if not available_images:
+                        # If all images used, reset and reuse
+                        available_images = image_urls
+                        used_images.clear()
+                    
+                    selected_image = random.choice(available_images)
+                    new_images = [selected_image]
+                    used_images.add(selected_image)
+                else:
+                    # For multiple images, use the existing logic
+                    new_images = self.generate_listing_images(image_urls, images_per_listing)
+                
+                if self.update_listing_images(listing_id, new_images, table_name):
                     updated_count += 1
-                    if i % 100 == 0:
-                        print(f"✅ Updated {i}/{total_listings} listings...")
+                    print(f"  ✅ Listing {i}: {title} | {len(new_images)} image(s)")
+                    if i % 10 == 0:
+                        print(f"     Progress: {i}/{total_listings} listings updated...")
                 else:
                     failed_count += 1
+                    print(f"  ❌ Listing {i}: Failed to update")
             
             print(f"\n🎉 Image update completed!")
-            print(f"✅ Successfully updated: {updated_count} listings")
+            print(f"✅ Successfully updated: {updated_count} listings in {table_name}")
             if failed_count > 0:
                 print(f"❌ Failed to update: {failed_count} listings")
             
