@@ -37,17 +37,14 @@ dreamheaven-backend/
 ├── requirements.txt        # Python dependencies
 ├── env.example            # Environment variables template
 ├── README.md              # This file
+├── ETL_README.md          # ETL pipeline documentation
 ├── scripts/               # Data generation scripts
 │   ├── __init__.py
 │   ├── config.py          # Configuration management
 │   ├── data_generator.py  # Real estate data generation
 │   ├── supabase_manager.py # Database operations
 │   ├── generate_data.py   # Main data generation script
-│   ├── fetch_unsplash_images.py # Unsplash API integration
-│   ├── fetch_high_quality_images.py # Curated images (no API key)
-│   ├── update_listings_with_images.py # Image update utilities
-│   ├── upgrade_images.py  # One-click image upgrade
-│   └── check_and_update_remaining.py # Check for remaining updates
+│   └── upgrade_images.py  # One-click image upgrade
 ├── api/                   # API routes
 │   ├── __init__.py
 │   └── routes/
@@ -56,6 +53,18 @@ dreamheaven-backend/
 │       ├── buyers.py      # Buyer management
 │       ├── listings.py    # Property listings CRUD
 │       └── search.py      # Search functionality
+├── etl/                   # ETL pipeline core modules
+│   ├── struct_tags.py     # ETL #1: Structured tags generation
+│   └── embedding_text.py  # ETL #2: Embedding text generation
+├── jobs/                  # ETL job execution scripts
+│   ├── update_struct_tags.py    # ETL #1 job runner
+│   └── update_embedding_text.py # ETL #2 job runner
+├── config/                # ETL configuration files
+│   ├── tags_struct_rules.yaml   # Rule-based tag generation config
+│   └── text_extraction_keywords.yaml # Text extraction config
+├── tests/                 # Unit tests
+│   ├── test_etl_struct_tags.py  # ETL #1 tests
+│   └── test_etl_embedding_text.py # ETL #2 tests
 └── data/                  # Generated data backups
 ```
 
@@ -433,6 +442,57 @@ Benefits:
 - **2000 listings** with 1 image each
 - **200x image reuse** (2000 ÷ 10)
 - **Verified URLs** - all images tested and working
+
+## ETL Pipelines
+
+The backend includes two ETL (Extract, Transform, Load) pipelines for enhancing listing data:
+
+### **ETL #1: Structured Tags Generation**
+Generates tags from structured property data using rule-based logic.
+
+```bash
+# Dry run (preview changes)
+python jobs/update_struct_tags.py --dry-run
+
+# Production run
+python jobs/update_struct_tags.py
+```
+
+**Features:**
+- Rule-based tag generation from property attributes
+- Configurable thresholds and conditions
+- Idempotent operations (safe to re-run)
+- Comprehensive logging and audit trail
+
+### **ETL #2: Embedding Text Generation**
+Creates embedding-ready text from listing titles and descriptions.
+
+```bash
+# Dry run (preview changes)
+python jobs/update_embedding_text.py --dry-run
+
+# Production run
+python jobs/update_embedding_text.py
+```
+
+**Features:**
+- Extracts semantic cues from text content
+- Builds structured embedding text for AI search
+- Configurable keyword extraction rules
+- Length optimization for vector embeddings
+
+### **Configuration**
+- `config/tags_struct_rules.yaml` - Tag generation rules and thresholds
+- `config/text_extraction_keywords.yaml` - Text extraction keywords and context rules
+
+### **Testing**
+```bash
+# Run ETL unit tests
+python -m pytest tests/test_etl_struct_tags.py
+python -m pytest tests/test_etl_embedding_text.py
+```
+
+For detailed ETL documentation, see [ETL_README.md](ETL_README.md).
 
 ## Future Features
 
