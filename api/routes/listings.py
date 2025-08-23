@@ -26,12 +26,12 @@ class ListingBase(BaseModel):
     title: str
     description: str
     property_type: str
+    property_listing_type: str
     bedrooms: int
     bathrooms: int
-    max_guests: int
     square_feet: int
-    price_per_night: float
-    price_per_month: float
+    price_per_month: Optional[float] = None
+    price_for_sale: Optional[float] = None
     city: str
     state: str
     country: str
@@ -39,8 +39,11 @@ class ListingBase(BaseModel):
     longitude: float
     address: str
     neighborhood: str
+    garage_number: Optional[int] = None
+    has_yard: bool = False
+    has_parking_lot: bool = False
     amenities: List[str]
-    images: List[str]
+    images: Optional[List[str]] = None
     is_available: bool = True
     is_featured: bool = False
 
@@ -50,8 +53,9 @@ class ListingCreate(ListingBase):
 class ListingResponse(ListingBase):
     id: str
     host_id: str
-    rating: float
-    review_count: int
+    rating: Optional[float] = None
+    review_count: Optional[int] = None
+    embedding_text: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -62,12 +66,12 @@ class ListingUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     property_type: Optional[str] = None
+    property_listing_type: Optional[str] = None
     bedrooms: Optional[int] = None
     bathrooms: Optional[int] = None
-    max_guests: Optional[int] = None
     square_feet: Optional[int] = None
-    price_per_night: Optional[float] = None
     price_per_month: Optional[float] = None
+    price_for_sale: Optional[float] = None
     city: Optional[str] = None
     state: Optional[str] = None
     country: Optional[str] = None
@@ -75,10 +79,14 @@ class ListingUpdate(BaseModel):
     longitude: Optional[float] = None
     address: Optional[str] = None
     neighborhood: Optional[str] = None
+    garage_number: Optional[int] = None
+    has_yard: Optional[bool] = None
+    has_parking_lot: Optional[bool] = None
     amenities: Optional[List[str]] = None
     images: Optional[List[str]] = None
     is_available: Optional[bool] = None
     is_featured: Optional[bool] = None
+    embedding_text: Optional[str] = None
 
 # Pydantic models for the new endpoint
 class ListingItem(BaseModel):
@@ -128,9 +136,9 @@ async def get_filtered_listings(
         # Calculate offset for pagination
         offset = (page - 1) * limit
         
-        # Build query with ALL fields from the listings table
+        # Build query with ALL fields from the listings_v2 table
         try:
-            query = supabase.client.table("listings").select("*")
+            query = supabase.client.table("listings_v2").select("*")
             print(f"✅ Query built successfully with filters: location={location}, bed={bed}, bath={bath}, rent={rent}, sortBy={sortBy}, sortOrder={sortOrder}")
         except Exception as e:
             print(f"❌ Error building query: {str(e)}")
@@ -185,19 +193,26 @@ async def get_filtered_listings(
         if sortBy:
             # Map frontend sort fields to database fields
             sort_field_mapping = {
-                "price": "price_per_night",  # Default to nightly price for sorting
+                "price": "price_per_month",  # Default to monthly price for sorting
                 "bedrooms": "bedrooms",
                 "bathrooms": "bathrooms",
                 "square_feet": "square_feet"
             }
             
-            db_sort_field = sort_field_mapping.get(sortBy, "price_per_night")
+            db_sort_field = sort_field_mapping.get(sortBy, "price_per_month")
             sort_direction = "asc" if sortOrder and sortOrder.lower() == "asc" else "desc"
             
-            if sort_direction == "asc":
-                query = query.order(db_sort_field, desc=False)
+            # Special handling for price sorting to consider both rent and sale prices
+            if sortBy == "price":
+                # For price sorting, we'll fetch all data and sort in Python
+                # This ensures proper handling of mixed rent/sale properties
+                print(f"🔍 Price sorting requested - will sort in Python after fetch")
             else:
-                query = query.order(db_sort_field, desc=True)
+                # For non-price sorting, use the standard approach
+                if sort_direction == "asc":
+                    query = query.order(db_sort_field, desc=False)
+                else:
+                    query = query.order(db_sort_field, desc=True)
         
         # Get total count first
         try:
@@ -221,17 +236,55 @@ async def get_filtered_listings(
             raise HTTPException(status_code=500, detail=f"Error fetching results: {str(e)}")
         
         if result.data:
-            # Transform data to return full listing objects
-            listings_dict = {}
-            for item in result.data:
-                # Return the full listing object as-is from the database
-                # This includes all fields: id, title, description, property_type, property_listing_type,
-                # bedrooms, bathrooms, square_feet, garage_number, price_per_night, price_per_month, price_for_sale,
-                # city, state, country, latitude, longitude, address, neighborhood,
-                # has_yard, has_parking_lot, amenities, images, is_available, is_featured, rating, review_count
+            # Handle price sorting in Python if needed
+            if sortBy == "price":
+                print(f"🔍 Sorting {len(result.data)} items by price in Python...")
                 
-                # Use the listing ID as the key in the dictionary
-                listings_dict[item.get("id", "")] = item
+                # Create a list of items with their effective price for sorting
+                items_with_price = []
+                for item in result.data:
+                    # Determine the effective price (sale price or monthly rent)
+                    sale_price = item.get("price_for_sale")
+                    monthly_price = item.get("price_per_month")
+                    
+                    # Use sale price if available, otherwise use monthly price
+                    effective_price = sale_price if sale_price is not None else monthly_price
+                    
+                    # Skip items with no price
+                    if effective_price is not None:
+                        items_with_price.append((item, effective_price))
+                
+                # Sort by effective price
+                if sort_direction == "asc":
+                    items_with_price.sort(key=lambda x: x[1])
+                else:
+                    items_with_price.sort(key=lambda x: x[1], reverse=True)
+                
+                # Extract sorted items
+                sorted_items = [item[0] for item in items_with_price]
+                print(f"✅ Sorted {len(sorted_items)} items by price ({sort_direction})")
+                
+                # Apply pagination to sorted results
+                start_idx = offset
+                end_idx = offset + limit
+                paginated_items = sorted_items[start_idx:end_idx]
+                
+                # Transform data to return full listing objects
+                listings_dict = {}
+                for item in paginated_items:
+                    listings_dict[item.get("id", "")] = item
+            else:
+                # Transform data to return full listing objects (no price sorting needed)
+                listings_dict = {}
+                for item in result.data:
+                    # Return the full listing object as-is from the database
+                    # This includes all fields: id, title, description, property_type, property_listing_type,
+                    # bedrooms, bathrooms, square_feet, garage_number, price_per_month, price_for_sale,
+                    # city, state, country, latitude, longitude, address, neighborhood,
+                    # has_yard, has_parking_lot, amenities, images, is_available, is_featured, rating, review_count
+                    
+                    # Use the listing ID as the key in the dictionary
+                    listings_dict[item.get("id", "")] = item
             
             # Calculate if there are more pages
             has_more = (page * limit) < total
@@ -265,7 +318,7 @@ async def get_listing(listing_id: str):
         if supabase is None:
             raise HTTPException(status_code=500, detail="Database connection not available")
             
-        result = supabase.client.table("listings").select("*").eq("id", listing_id).execute()
+        result = supabase.client.table("listings_v2").select("*").eq("id", listing_id).execute()
         
         if result.data:
             # Return the full listing object as-is from the database
@@ -289,7 +342,7 @@ async def create_listing(listing: ListingCreate):
         listing_data["rating"] = 0.0
         listing_data["review_count"] = 0
         
-        result = supabase.client.table("listings").insert(listing_data).execute()
+        result = supabase.client.table("listings_v2").insert(listing_data).execute()
         
         if result.data:
             return result.data[0]
@@ -308,7 +361,7 @@ async def update_listing(listing_id: str, listing: ListingUpdate):
         update_data = listing.dict(exclude_unset=True)
         update_data["updated_at"] = datetime.now().isoformat()
         
-        result = supabase.client.table("listings").update(update_data).eq("id", listing_id).execute()
+        result = supabase.client.table("listings_v2").update(update_data).eq("id", listing_id).execute()
         
         if result.data:
             return result.data[0]
@@ -324,7 +377,7 @@ async def update_listing(listing_id: str, listing: ListingUpdate):
 async def delete_listing(listing_id: str):
     """Delete a listing"""
     try:
-        result = supabase.client.table("listings").delete().eq("id", listing_id).execute()
+        result = supabase.client.table("listings_v2").delete().eq("id", listing_id).execute()
         
         if result.data:
             return {"message": "Listing deleted successfully"}
@@ -340,7 +393,7 @@ async def delete_listing(listing_id: str):
 async def get_listings_by_host(host_id: str):
     """Get all listings for a specific host"""
     try:
-        result = supabase.client.table("listings").select("*").eq("host_id", host_id).execute()
+        result = supabase.client.table("listings_v2").select("*").eq("host_id", host_id).execute()
         
         if result.data:
             return result.data
@@ -354,7 +407,7 @@ async def get_listings_by_host(host_id: str):
 async def get_cities():
     """Get list of all cities with listings"""
     try:
-        result = supabase.client.table("listings").select("city, state").execute()
+        result = supabase.client.table("listings_v2").select("city, state").execute()
         
         if result.data:
             # Get unique cities
@@ -373,7 +426,7 @@ async def get_cities():
 async def get_property_types():
     """Get list of all property types"""
     try:
-        result = supabase.client.table("listings").select("property_type").execute()
+        result = supabase.client.table("listings_v2").select("property_type").execute()
         
         if result.data:
             # Get unique property types

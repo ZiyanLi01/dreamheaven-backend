@@ -62,7 +62,7 @@ class SupabaseManager:
         return created_users
     
     def create_listing(self, listing_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a listing in the listings table"""
+        """Create a listing in the listings_v2 table"""
         try:
             # Prepare listing data for database
             db_listing = {
@@ -74,9 +74,7 @@ class SupabaseManager:
                 "property_listing_type": listing_data["property_listing_type"],
                 "bedrooms": listing_data["bedrooms"],
                 "bathrooms": listing_data["bathrooms"],
-                "max_guests": listing_data["max_guests"],
                 "square_feet": listing_data["square_feet"],
-                "price_per_night": listing_data["price_per_night"],
                 "price_per_month": listing_data["price_per_month"],
                 "price_for_sale": listing_data["price_for_sale"],
                 "city": listing_data["city"],
@@ -86,20 +84,21 @@ class SupabaseManager:
                 "longitude": listing_data["longitude"],
                 "address": listing_data["address"],
                 "neighborhood": listing_data["neighborhood"],
-                "garage_number": listing_data["garage_number"],
-                "has_yard": listing_data["has_yard"],
-                "has_parking_lot": listing_data["has_parking_lot"],
+                "garage_number": listing_data.get("garage_number"),
+                "has_yard": listing_data.get("has_yard", False),
+                "has_parking_lot": listing_data.get("has_parking_lot", False),
                 "amenities": listing_data["amenities"],
                 "images": listing_data["images"],
                 "is_available": listing_data["is_available"],
                 "is_featured": listing_data["is_featured"],
-                "rating": listing_data["rating"],
-                "review_count": listing_data["review_count"],
+                "rating": listing_data.get("rating"),
+                "review_count": listing_data.get("review_count"),
+                "embedding_text": listing_data.get("embedding_text", ""),
                 "created_at": listing_data["created_at"],
                 "updated_at": listing_data["updated_at"]
             }
             
-            result = self.client.table("listings").insert(db_listing).execute()
+            result = self.client.table("listings_v2").insert(db_listing).execute()
             
             if result.data:
                 print(f"✅ Created listing: {listing_data['title']}")
@@ -132,9 +131,7 @@ class SupabaseManager:
                         "property_listing_type": listing["property_listing_type"],
                         "bedrooms": listing["bedrooms"],
                         "bathrooms": listing["bathrooms"],
-                        "max_guests": listing["max_guests"],
                         "square_feet": listing["square_feet"],
-                        "price_per_night": listing["price_per_night"],
                         "price_per_month": listing["price_per_month"],
                         "price_for_sale": listing["price_for_sale"],
                         "city": listing["city"],
@@ -144,21 +141,22 @@ class SupabaseManager:
                         "longitude": listing["longitude"],
                         "address": listing["address"],
                         "neighborhood": listing["neighborhood"],
-                        "garage_number": listing["garage_number"],
-                        "has_yard": listing["has_yard"],
-                        "has_parking_lot": listing["has_parking_lot"],
+                        "garage_number": listing.get("garage_number"),
+                        "has_yard": listing.get("has_yard", False),
+                        "has_parking_lot": listing.get("has_parking_lot", False),
                         "amenities": listing["amenities"],
                         "images": listing["images"],
                         "is_available": listing["is_available"],
                         "is_featured": listing["is_featured"],
-                        "rating": listing["rating"],
-                        "review_count": listing["review_count"],
+                        "rating": listing.get("rating"),
+                        "review_count": listing.get("review_count"),
+                        "embedding_text": listing.get("embedding_text", ""),
                         "created_at": listing["created_at"],
                         "updated_at": listing["updated_at"]
                     }
                     batch_data.append(db_listing)
                 
-                result = self.client.table("listings").insert(batch_data).execute()
+                result = self.client.table("listings_v2").insert(batch_data).execute()
                 
                 if result.data:
                     created_listings.extend(result.data)
@@ -183,9 +181,9 @@ class SupabaseManager:
             return []
     
     def get_all_listings(self) -> List[Dict[str, Any]]:
-        """Get all listings from the listings table"""
+        """Get all listings from the listings_v2 table"""
         try:
-            result = self.client.table("listings").select("*").execute()
+            result = self.client.table("listings_v2").select("*").execute()
             return result.data if result.data else []
         except Exception as e:
             print(f"❌ Error fetching listings: {str(e)}")
@@ -194,18 +192,18 @@ class SupabaseManager:
     def get_listings_by_host(self, host_id: str) -> List[Dict[str, Any]]:
         """Get all listings for a specific host"""
         try:
-            result = self.client.table("listings").select("*").eq("host_id", host_id).execute()
+            result = self.client.table("listings_v2").select("*").eq("host_id", host_id).execute()
             return result.data if result.data else []
         except Exception as e:
             print(f"❌ Error fetching listings for host {host_id}: {str(e)}")
             return []
     
     def delete_all_data(self):
-        """Delete all data from listings and profiles tables (for testing)"""
+        """Delete all data from listings_v2 and profiles tables (for testing)"""
         try:
             # Delete listings first (due to foreign key constraints)
-            self.client.table("listings").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-            print("✅ Deleted all listings")
+            self.client.table("listings_v2").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+            print("✅ Deleted all listings from listings_v2")
             
             # Note: We don't delete profiles as they're linked to auth users
             print("⚠️  Skipping profiles deletion (linked to auth users)")
@@ -219,4 +217,4 @@ class SupabaseManager:
         # For now, we'll assume the tables exist
         print("ℹ️  Please ensure the following tables exist in your Supabase database:")
         print("   - profiles (id, email, first_name, last_name, full_name, phone, avatar_url, bio, is_host, is_verified, created_at, updated_at)")
-        print("   - listings (id, host_id, title, description, property_type, bedrooms, bathrooms, max_guests, square_feet, price_per_night, price_per_month, city, state, country, latitude, longitude, address, neighborhood, amenities, images, is_available, is_featured, rating, review_count, created_at, updated_at)") 
+        print("   - listings_v2 (id, host_id, title, description, property_type, property_listing_type, bedrooms, bathrooms, square_feet, price_per_month, price_for_sale, city, state, country, latitude, longitude, address, neighborhood, garage_number, has_yard, has_parking_lot, amenities, images, is_available, is_featured, rating, review_count, embedding_text, created_at, updated_at)") 

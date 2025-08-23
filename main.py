@@ -62,7 +62,7 @@ async def debug_request():
     try:
         # Test Supabase connection
         supabase = SupabaseManager()
-        test_result = supabase.client.table("listings").select("id").limit(1).execute()
+        test_result = supabase.client.table("listings_v2").select("id").limit(1).execute()
         supabase_status = "connected" if test_result.data else "no_data"
     except Exception as e:
         supabase_status = f"error: {str(e)}"

@@ -8,7 +8,7 @@ import json
 
 def test_search_endpoint():
     """Test the POST search endpoint with various scenarios"""
-    base_url = "http://localhost:8000/api/search"
+    base_url = "http://localhost:8080/search"
     
     print("🔍 Testing POST /api/search Endpoint")
     print("=" * 50)

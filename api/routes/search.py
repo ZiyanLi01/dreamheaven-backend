@@ -21,16 +21,21 @@ class SearchResult(BaseModel):
     title: str
     description: str
     property_type: str
+    property_listing_type: str
     bedrooms: int
     bathrooms: int
-    price_per_night: float
+    price_per_month: Optional[float] = None
+    price_for_sale: Optional[float] = None
     city: str
     state: str
     neighborhood: str
+    garage_number: Optional[int] = None
+    has_yard: bool = False
+    has_parking_lot: bool = False
     amenities: List[str]
-    images: List[str]
-    rating: float
-    review_count: int
+    images: Optional[List[str]] = None
+    rating: Optional[float] = None
+    review_count: Optional[int] = None
     is_available: bool
     is_featured: bool
     latitude: float
@@ -61,8 +66,8 @@ async def search_listings_post(search_request: SearchRequest):
         # Calculate offset for pagination
         offset = (search_request.page - 1) * search_request.limit
         
-        # Build query with ALL fields from the listings table
-        query = supabase.client.table("listings").select("*")
+        # Build query with ALL fields from the listings_v2 table
+        query = supabase.client.table("listings_v2").select("*")
         
         # Apply location filter
         if search_request.location:
@@ -125,13 +130,13 @@ async def search_listings_post(search_request: SearchRequest):
         if search_request.sortBy:
             # Map frontend sort fields to database fields
             sort_field_mapping = {
-                "price": "price_per_night",  # Default to nightly price for sorting
+                "price": "price_per_month",  # Default to monthly price for sorting
                 "bedrooms": "bedrooms",
                 "bathrooms": "bathrooms",
                 "square_feet": "square_feet"
             }
             
-            db_sort_field = sort_field_mapping.get(search_request.sortBy, "price_per_night")
+            db_sort_field = sort_field_mapping.get(search_request.sortBy, "price_per_month")
             sort_direction = "asc" if search_request.sortOrder and search_request.sortOrder.lower() == "asc" else "desc"
             
             if sort_direction == "asc":
@@ -153,7 +158,7 @@ async def search_listings_post(search_request: SearchRequest):
             for item in result.data:
                 # Return the full listing object as-is from the database
                 # This includes all fields: id, title, description, property_type, property_listing_type,
-                # bedrooms, bathrooms, square_feet, garage_number, price_per_night, price_per_month, price_for_sale,
+                # bedrooms, bathrooms, square_feet, garage_number, price_per_month, price_for_sale,
                 # city, state, country, latitude, longitude, address, neighborhood,
                 # has_yard, has_parking_lot, amenities, images, is_available, is_featured, rating, review_count
                 
@@ -208,7 +213,7 @@ async def search_listings(
         offset = (page - 1) * limit
         
         # Build query
-        query = supabase.client.table("listings").select("*")
+        query = supabase.client.table("listings_v2").select("*")
         
         # Apply text search if query provided
         if q:
@@ -223,9 +228,9 @@ async def search_listings(
         if property_type:
             query = query.eq("property_type", property_type)
         if min_price is not None:
-            query = query.gte("price_per_night", min_price)
+            query = query.gte("price_per_month", min_price)
         if max_price is not None:
-            query = query.lte("price_per_night", max_price)
+            query = query.lte("price_per_month", max_price)
         if min_bedrooms is not None:
             query = query.gte("bedrooms", min_bedrooms)
         if max_bedrooms is not None:
@@ -303,7 +308,7 @@ async def search_nearby(
         lng_max = longitude + radius_degrees
         
         # Query listings within bounding box
-        query = supabase.client.table("listings").select("*").eq("is_available", True)
+        query = supabase.client.table("listings_v2").select("*").eq("is_available", True)
         query = query.gte("latitude", lat_min).lte("latitude", lat_max)
         query = query.gte("longitude", lng_min).lte("longitude", lng_max)
         query = query.limit(limit)
@@ -339,12 +344,12 @@ async def get_search_suggestions(
         }
         
         # Get city suggestions
-        city_result = supabase.client.table("listings").select("city").ilike("city", f"%{q}%").limit(5).execute()
+        city_result = supabase.client.table("listings_v2").select("city").ilike("city", f"%{q}%").limit(5).execute()
         if city_result.data:
             suggestions["cities"] = list(set([item["city"] for item in city_result.data]))
         
         # Get neighborhood suggestions
-        neighborhood_result = supabase.client.table("listings").select("neighborhood").ilike("neighborhood", f"%{q}%").limit(5).execute()
+        neighborhood_result = supabase.client.table("listings_v2").select("neighborhood").ilike("neighborhood", f"%{q}%").limit(5).execute()
         if neighborhood_result.data:
             suggestions["neighborhoods"] = list(set([item["neighborhood"] for item in neighborhood_result.data]))
         
@@ -368,21 +373,21 @@ async def get_search_stats():
         stats = {}
         
         # Get total listings count
-        total_result = supabase.client.table("listings").select("id", count="exact").execute()
+        total_result = supabase.client.table("listings_v2").select("id", count="exact").execute()
         stats["total_listings"] = total_result.count if total_result.count else 0
         
         # Get available listings count
-        available_result = supabase.client.table("listings").select("id", count="exact").eq("is_available", True).execute()
+        available_result = supabase.client.table("listings_v2").select("id", count="exact").eq("is_available", True).execute()
         stats["available_listings"] = available_result.count if available_result.count else 0
         
         # Get featured listings count
-        featured_result = supabase.client.table("listings").select("id", count="exact").eq("is_featured", True).execute()
+        featured_result = supabase.client.table("listings_v2").select("id", count="exact").eq("is_featured", True).execute()
         stats["featured_listings"] = featured_result.count if featured_result.count else 0
         
         # Get price range
-        price_result = supabase.client.table("listings").select("price_per_night").execute()
+        price_result = supabase.client.table("listings_v2").select("price_per_month").execute()
         if price_result.data:
-            prices = [item["price_per_night"] for item in price_result.data if item["price_per_night"]]
+            prices = [item["price_per_month"] for item in price_result.data if item["price_per_month"]]
             stats["price_range"] = {
                 "min": min(prices) if prices else 0,
                 "max": max(prices) if prices else 0,
@@ -390,12 +395,12 @@ async def get_search_stats():
             }
         
         # Get cities count
-        cities_result = supabase.client.table("listings").select("city").execute()
+        cities_result = supabase.client.table("listings_v2").select("city").execute()
         if cities_result.data:
             stats["cities_count"] = len(set([item["city"] for item in cities_result.data]))
         
         # Get property types count
-        types_result = supabase.client.table("listings").select("property_type").execute()
+        types_result = supabase.client.table("listings_v2").select("property_type").execute()
         if types_result.data:
             stats["property_types_count"] = len(set([item["property_type"] for item in types_result.data]))
         

@@ -8,11 +8,11 @@ import requests
 import json
 from typing import Dict, Any
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:8080"
 
 def test_listings_endpoint(params: Dict[str, Any] = None) -> Dict[str, Any]:
     """Test the listings endpoint with given parameters"""
-    url = f"{BASE_URL}/api/listings"
+    url = f"{BASE_URL}/listings"
     
     try:
         response = requests.get(url, params=params)
@@ -33,10 +33,10 @@ def print_response(response: Dict[str, Any], test_name: str):
         print(f"📄 Current page: {response.get('page', 0)}")
         print(f"📄 Limit per page: {response.get('limit', 0)}")
         print(f"📄 Has more pages: {response.get('has_more', False)}")
-        print(f"📄 Results count: {len(response.get('results', []))}")
+        print(f"📄 Results count: {len(response.get('results', {}))}")
         
         # Show first few results
-        results = response.get('results', [])
+        results = list(response.get('results', {}).values())
         if results:
             print(f"\n🏠 Sample listings:")
             for i, listing in enumerate(results[:3], 1):

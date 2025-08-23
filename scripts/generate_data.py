@@ -67,8 +67,8 @@ def main():
         print(f"✅ Successfully created {len(created_hosts)} hosts")
         
         # Step 2: Generate and create listings
-        print(f"\n🏘️  Step 2: Creating {num_listings} listings...")
-        listings_data = generator.generate_listings(host_ids, num_listings)
+        print(f"\n🏘️  Step 2: Creating {num_listings} listings in listings_v2 table...")
+        listings_data = generator.generate_listings_v2(host_ids, num_listings)
         
         created_listings = supabase.create_listings_batch(listings_data)
         
@@ -142,7 +142,7 @@ def generate_listings_only():
         num_listings = Config.NUM_LISTINGS
         print(f"Creating {num_listings} listings...")
         
-        listings_data = generator.generate_listings(host_ids, num_listings)
+        listings_data = generator.generate_listings_v2(host_ids, num_listings)
         created_listings = supabase.create_listings_batch(listings_data)
         
         print(f"✅ Successfully created {len(created_listings)} listings")

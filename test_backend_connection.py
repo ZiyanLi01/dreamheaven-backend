@@ -9,7 +9,7 @@ import json
 
 def test_backend_connection():
     """Test the backend connection and endpoints"""
-    base_url = "http://localhost:8000"
+    base_url = "http://localhost:8080"
     
     print("🔍 Testing Backend Connection")
     print("=" * 40)
@@ -39,11 +39,11 @@ def test_backend_connection():
     
     # Test 3: Basic listings endpoint
     try:
-        response = requests.get(f"{base_url}/api/listings/")
+        response = requests.get(f"{base_url}/listings/")
         if response.status_code == 200:
             data = response.json()
             print("✅ Basic listings: PASSED")
-            print(f"   Results: {len(data.get('results', []))}")
+            print(f"   Results: {len(data.get('results', {}))}")
             print(f"   Total: {data.get('total', 0)}")
         else:
             print(f"❌ Basic listings: FAILED (Status: {response.status_code})")
@@ -58,11 +58,11 @@ def test_backend_connection():
             "sortBy": "price",
             "sortOrder": "asc"
         }
-        response = requests.get(f"{base_url}/api/listings/", params=params)
+        response = requests.get(f"{base_url}/listings/", params=params)
         if response.status_code == 200:
             data = response.json()
             print("✅ Frontend request: PASSED")
-            print(f"   Results: {len(data.get('results', []))}")
+            print(f"   Results: {len(data.get('results', {}))}")
             print(f"   Total: {data.get('total', 0)}")
         else:
             print(f"❌ Frontend request: FAILED (Status: {response.status_code})")
@@ -79,11 +79,11 @@ def test_backend_connection():
             "sortBy": "price",
             "sortOrder": "desc"
         }
-        response = requests.get(f"{base_url}/api/listings/", params=params)
+        response = requests.get(f"{base_url}/listings/", params=params)
         if response.status_code == 200:
             data = response.json()
             print("✅ Complex filtering: PASSED")
-            print(f"   Results: {len(data.get('results', []))}")
+            print(f"   Results: {len(data.get('results', {}))}")
             print(f"   Total: {data.get('total', 0)}")
         else:
             print(f"❌ Complex filtering: FAILED (Status: {response.status_code})")
