@@ -123,18 +123,13 @@ async def get_filtered_listings(
     bath: Optional[str] = Query(None, description="Filter by bathrooms ('Any', '2+', or specific number)"),
     rent: Optional[str] = Query(None, description="Filter by rent type ('For Rent' or 'For Sale')"),
     sortBy: Optional[str] = Query(None, description="Sort by field (e.g., 'price', 'bedrooms')"),
-    sortOrder: Optional[str] = Query("asc", description="Sort order ('asc' or 'desc')"),
-    page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(30, ge=1, le=100, description="Number of records per page")
+    sortOrder: Optional[str] = Query("asc", description="Sort order ('asc' or 'desc')")
 ):
-    """Get filtered property listings with pagination support"""
+    """Get filtered property listings - returns all results for frontend pagination"""
     try:
         # Check if Supabase client is available
         if supabase is None:
             raise HTTPException(status_code=500, detail="Database connection not available")
-        
-        # Calculate offset for pagination
-        offset = (page - 1) * limit
         
         # Build query with ALL fields from the listings_v2 table
         try:
@@ -204,8 +199,8 @@ async def get_filtered_listings(
             
             # Special handling for price sorting to consider both rent and sale prices
             if sortBy == "price":
-                # For price sorting, we'll fetch all data and sort in Python
-                # This ensures proper handling of mixed rent/sale properties
+                # For price sorting, we'll use a computed field approach
+                # First, we'll fetch all data and sort in Python, then apply pagination
                 print(f"🔍 Price sorting requested - will sort in Python after fetch")
             else:
                 # For non-price sorting, use the standard approach
@@ -214,93 +209,89 @@ async def get_filtered_listings(
                 else:
                     query = query.order(db_sort_field, desc=True)
         
-        # Get total count first
-        try:
-            count_query = query
-            count_result = count_query.execute()
-            total = len(count_result.data) if count_result.data else 0
-            print(f"✅ Count query executed successfully: {total} total results")
-        except Exception as e:
-            print(f"❌ Error executing count query: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Error counting results: {str(e)}")
-        
-        # Apply pagination
-        query = query.range(offset, offset + limit - 1)
-        
-        # Execute query
+        # Execute query to get all filtered results
         try:
             result = query.execute()
-            print(f"✅ Main query executed successfully: {len(result.data) if result.data else 0} results returned")
+            print(f"✅ Query executed successfully: {len(result.data) if result.data else 0} results returned")
         except Exception as e:
-            print(f"❌ Error executing main query: {str(e)}")
+            print(f"❌ Error executing query: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error fetching results: {str(e)}")
         
         if result.data:
-            # Handle price sorting in Python if needed
-            if sortBy == "price":
-                print(f"🔍 Sorting {len(result.data)} items by price in Python...")
-                
-                # Create a list of items with their effective price for sorting
-                items_with_price = []
-                for item in result.data:
-                    # Determine the effective price (sale price or monthly rent)
-                    sale_price = item.get("price_for_sale")
-                    monthly_price = item.get("price_per_month")
+            # Handle sorting if requested
+            if sortBy:
+                if sortBy == "price":
+                    # Handle price sorting in Python
+                    print(f"🔍 Sorting {len(result.data)} items by price...")
                     
-                    # Use sale price if available, otherwise use monthly price
-                    effective_price = sale_price if sale_price is not None else monthly_price
+                    # Create a list of items with their effective price for sorting
+                    items_with_price = []
+                    for item in result.data:
+                        # Determine the effective price (sale price or monthly rent)
+                        sale_price = item.get("price_for_sale")
+                        monthly_price = item.get("price_per_month")
+                        
+                        # Use sale price if available, otherwise use monthly price
+                        effective_price = sale_price if sale_price is not None else monthly_price
+                        
+                        # Skip items with no price
+                        if effective_price is not None:
+                            items_with_price.append((item, effective_price))
                     
-                    # Skip items with no price
-                    if effective_price is not None:
-                        items_with_price.append((item, effective_price))
-                
-                # Sort by effective price
-                if sort_direction == "asc":
-                    items_with_price.sort(key=lambda x: x[1])
+                    # Sort by effective price
+                    if sort_direction == "asc":
+                        items_with_price.sort(key=lambda x: x[1])
+                    else:
+                        items_with_price.sort(key=lambda x: x[1], reverse=True)
+                    
+                    # Extract sorted items
+                    sorted_items = [item[0] for item in items_with_price]
+                    print(f"✅ Sorted {len(sorted_items)} items by price ({sort_direction})")
+                    
+                    # Transform data to return full listing objects
+                    listings_dict = {}
+                    for item in sorted_items:
+                        listings_dict[item.get("id", "")] = item
                 else:
-                    items_with_price.sort(key=lambda x: x[1], reverse=True)
-                
-                # Extract sorted items
-                sorted_items = [item[0] for item in items_with_price]
-                print(f"✅ Sorted {len(sorted_items)} items by price ({sort_direction})")
-                
-                # Apply pagination to sorted results
-                start_idx = offset
-                end_idx = offset + limit
-                paginated_items = sorted_items[start_idx:end_idx]
-                
-                # Transform data to return full listing objects
-                listings_dict = {}
-                for item in paginated_items:
-                    listings_dict[item.get("id", "")] = item
+                    # For non-price sorting, use database sorting
+                    sort_field_mapping = {
+                        "bedrooms": "bedrooms",
+                        "bathrooms": "bathrooms",
+                        "square_feet": "square_feet"
+                    }
+                    
+                    db_sort_field = sort_field_mapping.get(sortBy, "bedrooms")
+                    if sort_direction == "asc":
+                        query = query.order(db_sort_field, desc=False)
+                    else:
+                        query = query.order(db_sort_field, desc=True)
+                    
+                    # Re-execute query with sorting
+                    result = query.execute()
+                    
+                    # Transform data to return full listing objects
+                    listings_dict = {}
+                    for item in result.data:
+                        listings_dict[item.get("id", "")] = item
             else:
-                # Transform data to return full listing objects (no price sorting needed)
+                # No sorting requested, return as-is
                 listings_dict = {}
                 for item in result.data:
-                    # Return the full listing object as-is from the database
-                    # This includes all fields: id, title, description, property_type, property_listing_type,
-                    # bedrooms, bathrooms, square_feet, garage_number, price_per_month, price_for_sale,
-                    # city, state, country, latitude, longitude, address, neighborhood,
-                    # has_yard, has_parking_lot, amenities, images, is_available, is_featured, rating, review_count
-                    
-                    # Use the listing ID as the key in the dictionary
                     listings_dict[item.get("id", "")] = item
             
-            # Calculate if there are more pages
-            has_more = (page * limit) < total
-            
+            # Return all results for frontend pagination
             return PaginatedListingsResponse(
                 results=listings_dict,
-                page=page,
-                limit=limit,
-                total=total,
-                has_more=has_more
+                page=1,
+                limit=len(listings_dict),
+                total=len(listings_dict),
+                has_more=False
             )
         else:
             return PaginatedListingsResponse(
                 results={},
-                page=page,
-                limit=limit,
+                page=1,
+                limit=0,
                 total=0,
                 has_more=False
             )

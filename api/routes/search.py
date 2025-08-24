@@ -21,21 +21,16 @@ class SearchResult(BaseModel):
     title: str
     description: str
     property_type: str
-    property_listing_type: str
     bedrooms: int
     bathrooms: int
-    price_per_month: Optional[float] = None
-    price_for_sale: Optional[float] = None
+    price_per_night: float
     city: str
     state: str
     neighborhood: str
-    garage_number: Optional[int] = None
-    has_yard: bool = False
-    has_parking_lot: bool = False
     amenities: List[str]
-    images: Optional[List[str]] = None
-    rating: Optional[float] = None
-    review_count: Optional[int] = None
+    images: List[str]
+    rating: float
+    review_count: int
     is_available: bool
     is_featured: bool
     latitude: float
@@ -128,61 +123,131 @@ async def search_listings_post(search_request: SearchRequest):
         
         # Apply sorting
         if search_request.sortBy:
-            # Map frontend sort fields to database fields
-            sort_field_mapping = {
-                "price": "price_per_month",  # Default to monthly price for sorting
-                "bedrooms": "bedrooms",
-                "bathrooms": "bathrooms",
-                "square_feet": "square_feet"
-            }
-            
-            db_sort_field = sort_field_mapping.get(search_request.sortBy, "price_per_month")
             sort_direction = "asc" if search_request.sortOrder and search_request.sortOrder.lower() == "asc" else "desc"
             
-            if sort_direction == "asc":
-                query = query.order(db_sort_field, desc=False)
+            # Special handling for price sorting to consider both rent and sale prices
+            if search_request.sortBy == "price":
+                # For price sorting, we need to fetch all data first, sort it, then paginate
+                print(f"🔍 Price sorting requested in AI search - will sort in Python after fetch")
             else:
-                query = query.order(db_sort_field, desc=True)
-        
-        # Get total count first by executing the filtered query without pagination
-        count_result = query.execute()
-        total = len(count_result.data) if count_result.data else 0
-        
-        # Now apply pagination and execute again for the actual results
-        paginated_query = query.range(offset, offset + search_request.limit - 1)
-        result = paginated_query.execute()
-        
-        if result.data:
-            # Transform data to return full listing objects
-            listings_dict = {}
-            for item in result.data:
-                # Return the full listing object as-is from the database
-                # This includes all fields: id, title, description, property_type, property_listing_type,
-                # bedrooms, bathrooms, square_feet, garage_number, price_per_month, price_for_sale,
-                # city, state, country, latitude, longitude, address, neighborhood,
-                # has_yard, has_parking_lot, amenities, images, is_available, is_featured, rating, review_count
+                # For non-price sorting, use the standard approach
+                sort_field_mapping = {
+                    "bedrooms": "bedrooms",
+                    "bathrooms": "bathrooms",
+                    "square_feet": "square_feet"
+                }
                 
-                # Use the listing ID as the key in the dictionary
-                listings_dict[item.get("id", "")] = item
-            
-            # Calculate if there are more pages
-            has_more = (search_request.page * search_request.limit) < total
-            
-            return SearchResponse(
-                results=listings_dict,
-                total=total,
-                page=search_request.page,
-                limit=search_request.limit,
-                has_more=has_more
-            )
+                db_sort_field = sort_field_mapping.get(search_request.sortBy, "bedrooms")
+                if sort_direction == "asc":
+                    query = query.order(db_sort_field, desc=False)
+                else:
+                    query = query.order(db_sort_field, desc=True)
+        
+        # Handle price sorting differently - fetch all data first if sorting by price
+        if search_request.sortBy == "price":
+            # For price sorting, we need to fetch all data first, sort it, then paginate
+            try:
+                all_result = query.execute()
+                print(f"✅ Fetched all data for price sorting in AI search: {len(all_result.data) if all_result.data else 0} results")
+                
+                if all_result.data:
+                    # Create a list of items with their effective price for sorting
+                    items_with_price = []
+                    for item in all_result.data:
+                        # Determine the effective price (sale price or monthly rent)
+                        sale_price = item.get("price_for_sale")
+                        monthly_price = item.get("price_per_month")
+                        
+                        # Use sale price if available, otherwise use monthly price
+                        effective_price = sale_price if sale_price is not None else monthly_price
+                        
+                        # Skip items with no price
+                        if effective_price is not None:
+                            items_with_price.append((item, effective_price))
+                    
+                    # Sort by effective price
+                    if sort_direction == "asc":
+                        items_with_price.sort(key=lambda x: x[1])
+                    else:
+                        items_with_price.sort(key=lambda x: x[1], reverse=True)
+                    
+                    # Extract sorted items
+                    sorted_items = [item[0] for item in items_with_price]
+                    print(f"✅ Sorted {len(sorted_items)} items by price ({sort_direction}) in AI search")
+                    
+                    # Apply pagination to sorted results
+                    start_idx = offset
+                    end_idx = offset + search_request.limit
+                    paginated_items = sorted_items[start_idx:end_idx]
+                    
+                    # Transform data to return full listing objects
+                    listings_dict = {}
+                    for item in paginated_items:
+                        listings_dict[item.get("id", "")] = item
+                    
+                    # Calculate if there are more pages
+                    has_more = (search_request.page * search_request.limit) < len(sorted_items)
+                    
+                    return SearchResponse(
+                        results=listings_dict,
+                        total=len(sorted_items),
+                        page=search_request.page,
+                        limit=search_request.limit,
+                        has_more=has_more
+                    )
+                else:
+                    return SearchResponse(
+                        results={},
+                        total=0,
+                        page=search_request.page,
+                        limit=search_request.limit,
+                        has_more=False
+                    )
+                    
+            except Exception as e:
+                print(f"❌ Error executing price sorting query in AI search: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Error fetching results for price sorting: {str(e)}")
         else:
-            return SearchResponse(
-                results={},
-                total=0,
-                page=search_request.page,
-                limit=search_request.limit,
-                has_more=False
-            )
+            # For non-price sorting, use the standard approach with pagination
+            # Get total count first by executing the filtered query without pagination
+            count_result = query.execute()
+            total = len(count_result.data) if count_result.data else 0
+            
+            # Now apply pagination and execute again for the actual results
+            paginated_query = query.range(offset, offset + search_request.limit - 1)
+            result = paginated_query.execute()
+            
+            if result.data:
+                # Transform data to return full listing objects
+                listings_dict = {}
+                for item in result.data:
+                    # Return the full listing object as-is from the database
+                    # This includes all fields: id, title, description, property_type, property_listing_type,
+                    # bedrooms, bathrooms, square_feet, garage_number, price_per_month, price_for_sale,
+                    # city, state, country, latitude, longitude, address, neighborhood,
+                    # has_yard, has_parking_lot, amenities, images, is_available, is_featured, rating, review_count
+                    
+                    # Use the listing ID as the key in the dictionary
+                    listings_dict[item.get("id", "")] = item
+                
+                # Calculate if there are more pages
+                has_more = (search_request.page * search_request.limit) < total
+                
+                return SearchResponse(
+                    results=listings_dict,
+                    total=total,
+                    page=search_request.page,
+                    limit=search_request.limit,
+                    has_more=has_more
+                )
+            else:
+                return SearchResponse(
+                    results={},
+                    total=0,
+                    page=search_request.page,
+                    limit=search_request.limit,
+                    has_more=False
+                )
             
     except Exception as e:
         print(f"❌ Error in search_listings_post: {str(e)}")
@@ -228,9 +293,9 @@ async def search_listings(
         if property_type:
             query = query.eq("property_type", property_type)
         if min_price is not None:
-            query = query.gte("price_per_month", min_price)
+            query = query.gte("price_per_night", min_price)
         if max_price is not None:
-            query = query.lte("price_per_month", max_price)
+            query = query.lte("price_per_night", max_price)
         if min_bedrooms is not None:
             query = query.gte("bedrooms", min_bedrooms)
         if max_bedrooms is not None:
