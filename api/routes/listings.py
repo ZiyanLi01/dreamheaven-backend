@@ -13,13 +13,13 @@ from scripts.supabase_manager import SupabaseManager
 
 router = APIRouter()
 
-# Initialize Supabase client with error handling
-try:
-    supabase = SupabaseManager()
-    print("✅ Supabase client initialized successfully")
-except Exception as e:
-    print(f"❌ Error initializing Supabase client: {str(e)}")
-    supabase = None
+# Lazy initialization of Supabase client
+def get_supabase():
+    try:
+        return SupabaseManager()
+    except Exception as e:
+        print(f"Error initializing Supabase client: {str(e)}")
+        return None
 
 # Pydantic models
 class ListingBase(BaseModel):
@@ -127,16 +127,16 @@ async def get_filtered_listings(
 ):
     """Get filtered property listings - returns all results for frontend pagination"""
     try:
-        # Check if Supabase client is available
-        if supabase is None:
+        supabase = get_supabase()
+        if not supabase:
             raise HTTPException(status_code=500, detail="Database connection not available")
         
         # Build query with ALL fields from the listings_v2 table
         try:
             query = supabase.client.table("listings_v2").select("*")
-            print(f"✅ Query built successfully with filters: location={location}, bed={bed}, bath={bath}, rent={rent}, sortBy={sortBy}, sortOrder={sortOrder}")
+            print(f"Query built successfully with filters: location={location}, bed={bed}, bath={bath}, rent={rent}, sortBy={sortBy}, sortOrder={sortOrder}")
         except Exception as e:
-            print(f"❌ Error building query: {str(e)}")
+            print(f"Error building query: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error building database query: {str(e)}")
         
         # Apply location filter
@@ -212,9 +212,9 @@ async def get_filtered_listings(
         # Execute query to get all filtered results
         try:
             result = query.execute()
-            print(f"✅ Query executed successfully: {len(result.data) if result.data else 0} results returned")
+            print(f"Query executed successfully: {len(result.data) if result.data else 0} results returned")
         except Exception as e:
-            print(f"❌ Error executing query: {str(e)}")
+            print(f"Error executing query: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error fetching results: {str(e)}")
         
         if result.data:
@@ -306,7 +306,8 @@ async def get_filtered_listings(
 async def get_listing(listing_id: str):
     """Get a specific listing by ID - returns full listing object with all fields"""
     try:
-        if supabase is None:
+        supabase = get_supabase()
+        if not supabase:
             raise HTTPException(status_code=500, detail="Database connection not available")
             
         result = supabase.client.table("listings_v2").select("*").eq("id", listing_id).execute()
@@ -327,6 +328,10 @@ async def get_listing(listing_id: str):
 async def create_listing(listing: ListingCreate):
     """Create a new listing"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         listing_data = listing.dict()
         listing_data["created_at"] = datetime.now().isoformat()
         listing_data["updated_at"] = datetime.now().isoformat()
@@ -349,6 +354,10 @@ async def create_listing(listing: ListingCreate):
 async def update_listing(listing_id: str, listing: ListingUpdate):
     """Update an existing listing"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         update_data = listing.dict(exclude_unset=True)
         update_data["updated_at"] = datetime.now().isoformat()
         
@@ -368,6 +377,10 @@ async def update_listing(listing_id: str, listing: ListingUpdate):
 async def delete_listing(listing_id: str):
     """Delete a listing"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         result = supabase.client.table("listings_v2").delete().eq("id", listing_id).execute()
         
         if result.data:
@@ -384,6 +397,10 @@ async def delete_listing(listing_id: str):
 async def get_listings_by_host(host_id: str):
     """Get all listings for a specific host"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         result = supabase.client.table("listings_v2").select("*").eq("host_id", host_id).execute()
         
         if result.data:
@@ -398,6 +415,10 @@ async def get_listings_by_host(host_id: str):
 async def get_cities():
     """Get list of all cities with listings"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         result = supabase.client.table("listings_v2").select("city, state").execute()
         
         if result.data:
@@ -417,6 +438,10 @@ async def get_cities():
 async def get_property_types():
     """Get list of all property types"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         result = supabase.client.table("listings_v2").select("property_type").execute()
         
         if result.data:

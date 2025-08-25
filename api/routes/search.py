@@ -12,7 +12,14 @@ from scripts.config import Config
 from scripts.supabase_manager import SupabaseManager
 
 router = APIRouter()
-supabase = SupabaseManager()
+
+# Lazy initialization of Supabase client
+def get_supabase():
+    try:
+        return SupabaseManager()
+    except Exception as e:
+        print(f"Error initializing Supabase client: {str(e)}")
+        return None
 security = HTTPBearer()
 
 # Pydantic models
@@ -58,6 +65,10 @@ class SearchRequest(BaseModel):
 async def search_listings_post(search_request: SearchRequest):
     """Search listings with POST request - returns paginated results"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         # Build query with ALL fields from the listings_v2 table
         query = supabase.client.table("listings_v2").select("*")
         
@@ -257,6 +268,10 @@ async def search_listings(
 ):
     """Search listings with various filters and sorting options"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         # Build query
         query = supabase.client.table("listings_v2").select("*")
         
@@ -371,6 +386,10 @@ async def search_nearby(
 ):
     """Search for listings near a specific location"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         # Convert radius from km to degrees (approximate)
         # 1 degree ≈ 111 km
         radius_degrees = radius_km / 111.0
@@ -410,6 +429,10 @@ async def get_search_suggestions(
 ):
     """Get search suggestions based on partial query"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         suggestions = {
             "cities": [],
             "neighborhoods": [],
@@ -444,6 +467,10 @@ async def get_search_suggestions(
 async def get_search_stats():
     """Get search statistics and filters"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         stats = {}
         
         # Get total listings count
@@ -491,6 +518,10 @@ async def ai_search(
 ):
     """AI-powered natural language search (RAG integration) - Requires authentication"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         # Verify authentication
         supabase.client.auth.set_session(credentials.credentials, None)
         user = supabase.client.auth.get_user()

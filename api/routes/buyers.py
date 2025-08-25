@@ -13,8 +13,15 @@ from scripts.config import Config
 from scripts.supabase_manager import SupabaseManager
 
 router = APIRouter()
-supabase = SupabaseManager()
 security = HTTPBearer()
+
+# Lazy initialization of Supabase client
+def get_supabase():
+    try:
+        return SupabaseManager()
+    except Exception as e:
+        print(f"Error initializing Supabase client: {str(e)}")
+        return None
 
 # Pydantic models
 class BuyerBase(BaseModel):
@@ -62,6 +69,10 @@ async def get_buyers(
 ):
     """Get all buyers with optional filters"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         query = supabase.client.table("buyers").select("*")
         
         # Apply filters
@@ -85,6 +96,10 @@ async def get_buyers(
 async def get_buyer(buyer_id: str):
     """Get a specific buyer by ID"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         result = supabase.client.table("buyers").select("*").eq("id", buyer_id).execute()
         
         if result.data:
@@ -101,6 +116,10 @@ async def get_buyer(buyer_id: str):
 async def get_buyer_by_email(email: str):
     """Get a buyer by email address"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         result = supabase.client.table("buyers").select("*").eq("email", email).execute()
         
         if result.data:
@@ -117,6 +136,10 @@ async def get_buyer_by_email(email: str):
 async def update_buyer(buyer_id: str, buyer: BuyerUpdate):
     """Update an existing buyer"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         update_data = buyer.dict(exclude_unset=True)
         update_data["updated_at"] = datetime.now().isoformat()
         
@@ -144,6 +167,10 @@ async def update_buyer(buyer_id: str, buyer: BuyerUpdate):
 async def update_buyer_preferences(buyer_id: str, preferences: BuyerPreferences):
     """Update buyer search preferences"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         update_data = {
             "preferences": preferences.dict(exclude_unset=True),
             "updated_at": datetime.now().isoformat()
@@ -165,6 +192,10 @@ async def update_buyer_preferences(buyer_id: str, preferences: BuyerPreferences)
 async def get_buyer_preferences(buyer_id: str):
     """Get buyer search preferences"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         result = supabase.client.table("buyers").select("preferences").eq("id", buyer_id).execute()
         
         if result.data and result.data[0].get("preferences"):
@@ -179,6 +210,10 @@ async def get_buyer_preferences(buyer_id: str):
 async def delete_buyer(buyer_id: str):
     """Delete a buyer"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         result = supabase.client.table("buyers").delete().eq("id", buyer_id).execute()
         
         if result.data:
@@ -195,6 +230,10 @@ async def delete_buyer(buyer_id: str):
 async def get_verified_buyers():
     """Get all verified buyers"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         result = supabase.client.table("buyers").select("*").eq("is_verified", True).execute()
         
         if result.data:
@@ -209,6 +248,10 @@ async def get_verified_buyers():
 async def verify_buyer(buyer_id: str):
     """Verify a buyer"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         result = supabase.client.table("buyers").update({
             "is_verified": True,
             "updated_at": datetime.now().isoformat()
@@ -228,6 +271,10 @@ async def verify_buyer(buyer_id: str):
 async def unverify_buyer(buyer_id: str):
     """Unverify a buyer"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         result = supabase.client.table("buyers").update({
             "is_verified": False,
             "updated_at": datetime.now().isoformat()

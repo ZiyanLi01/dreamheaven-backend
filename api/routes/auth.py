@@ -13,8 +13,15 @@ from scripts.config import Config
 from scripts.supabase_manager import SupabaseManager
 
 router = APIRouter()
-supabase = SupabaseManager()
 security = HTTPBearer()
+
+# Lazy initialization of Supabase client
+def get_supabase():
+    try:
+        return SupabaseManager()
+    except Exception as e:
+        print(f"Error initializing Supabase client: {str(e)}")
+        return None
 
 # Pydantic models
 class BuyerLogin(BaseModel):
@@ -45,6 +52,10 @@ class PasswordUpdate(BaseModel):
 async def login(buyer_credentials: BuyerLogin):
     """Buyer login with email and password"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         # Authenticate with Supabase
         auth_response = supabase.client.auth.sign_in_with_password({
             "email": buyer_credentials.email,
@@ -75,6 +86,10 @@ async def login(buyer_credentials: BuyerLogin):
 async def register(buyer_data: BuyerRegister):
     """Buyer registration"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         # Create buyer in Supabase Auth
         auth_response = supabase.client.auth.sign_up({
             "email": buyer_data.email,
@@ -143,6 +158,10 @@ async def register(buyer_data: BuyerRegister):
 async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """User logout"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         # Sign out from Supabase
         supabase.client.auth.sign_out()
         return {"message": "Logged out successfully"}
@@ -154,6 +173,10 @@ async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
 async def refresh_token(refresh_token: str):
     """Refresh access token"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         # Refresh session with Supabase
         auth_response = supabase.client.auth.refresh_session(refresh_token)
         
@@ -181,6 +204,10 @@ async def refresh_token(refresh_token: str):
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Get current authenticated user"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         # Set the session with the access token
         supabase.client.auth.set_session(credentials.credentials, None)
         
@@ -206,6 +233,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 async def forgot_password(password_reset: PasswordReset):
     """Send password reset email"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         # Send password reset email via Supabase
         supabase.client.auth.reset_password_email(password_reset.email)
         return {"message": "Password reset email sent"}
@@ -217,6 +248,10 @@ async def forgot_password(password_reset: PasswordReset):
 async def reset_password(token: str, password_update: PasswordUpdate):
     """Reset password with token"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         # Update password with Supabase
         supabase.client.auth.update_user({"password": password_update.password})
         return {"message": "Password updated successfully"}
@@ -232,6 +267,10 @@ async def change_password(
 ):
     """Change password for authenticated user"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         # Set the session with the access token
         supabase.client.auth.set_session(credentials.credentials, None)
         
@@ -246,6 +285,10 @@ async def change_password(
 async def verify_email(token: str):
     """Verify email address"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         # Verify email with Supabase
         supabase.client.auth.verify_otp({
             "token_hash": token,
@@ -260,6 +303,10 @@ async def verify_email(token: str):
 async def resend_verification_email(email: EmailStr):
     """Resend verification email"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
         # Resend verification email via Supabase
         supabase.client.auth.resend_signup_email(email)
         return {"message": "Verification email sent"}
@@ -271,6 +318,13 @@ async def resend_verification_email(email: EmailStr):
 async def test_auth_config():
     """Test authentication configuration"""
     try:
+        supabase = get_supabase()
+        if not supabase:
+            return {
+                "message": "Auth configuration error",
+                "error": "Database connection not available"
+            }
+            
         # Test basic Supabase connection
         return {
             "message": "Auth configuration test",
