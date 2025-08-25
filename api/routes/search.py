@@ -61,6 +61,61 @@ class SearchRequest(BaseModel):
     page: int = 1
     limit: Optional[int] = None  # Remove default limit to return all results
 
+# Simple request model for frontend compatibility
+class SimpleSearchRequest(BaseModel):
+    page: int = 1
+    limit: Optional[int] = 10
+
+@router.post("/simple", response_model=SearchResponse)
+async def search_listings_simple(search_request: SimpleSearchRequest):
+    """Simple search endpoint for frontend compatibility"""
+    try:
+        supabase = get_supabase()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection not available")
+            
+        # Build query with ALL fields from the listings_v2 table
+        query = supabase.client.table("listings_v2").select("*")
+        
+        # Apply pagination
+        page = search_request.page
+        limit = search_request.limit or 30  # Default to 30 items per page
+        start_idx = (page - 1) * limit
+        end_idx = start_idx + limit
+        
+        # Apply pagination to database query
+        result = query.range(start_idx, end_idx - 1).execute()
+        
+        if result.data:
+            listings = result.data
+        else:
+            listings = []
+        
+        # Get total count for pagination info
+        count_query = supabase.client.table("listings_v2").select("id", count="exact")
+        total_result = count_query.execute()
+        total = total_result.count if hasattr(total_result, 'count') else 0
+        
+        # Transform to dictionary format
+        listings_dict = {}
+        for listing in listings:
+            listings_dict[listing.get("id", "")] = listing
+        
+        # Check if there are more results
+        has_more = end_idx < total
+        
+        return SearchResponse(
+            results=listings_dict,
+            total=total,
+            page=page,
+            limit=len(listings),
+            has_more=has_more
+        )
+        
+    except Exception as e:
+        print(f"Search error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
 @router.post("/", response_model=SearchResponse)
 async def search_listings_post(search_request: SearchRequest):
     """Search listings with POST request - returns paginated results"""
