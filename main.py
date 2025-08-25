@@ -33,7 +33,11 @@ FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "https://dreamheaven.vercel.app")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", FRONTEND_ORIGIN],
+    allow_origins=[
+        "http://localhost:3000", 
+        "https://dreamheaven-frontend.vercel.app",
+        FRONTEND_ORIGIN
+    ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type"],
@@ -73,6 +77,8 @@ async def debug_request():
     
     return {
         "status": "debug_info",
+        "frontend_origin": FRONTEND_ORIGIN,
+        "env_frontend_origin": os.getenv("FRONTEND_ORIGIN"),
         "supabase_status": supabase_status,
         "server_time": datetime.now().isoformat(),
         "message": "Backend is running and ready to handle requests"
