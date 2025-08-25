@@ -375,6 +375,7 @@ async def search_listings(
         )
         
     except Exception as e:
+        print(f"Search error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 @router.get("/nearby", response_model=List[SearchResult])
@@ -422,6 +423,26 @@ async def search_nearby(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Nearby search failed: {str(e)}")
+
+@router.get("/health")
+async def search_health_check():
+    """Health check for search service"""
+    try:
+        supabase = get_supabase()
+        if not supabase:
+            return {"status": "error", "message": "Database connection not available"}
+        
+        # Test a simple query
+        result = supabase.client.table("listings_v2").select("id", count="exact").execute()
+        count = result.count if hasattr(result, 'count') else 0
+        
+        return {
+            "status": "healthy", 
+            "message": "Search service is working",
+            "listings_count": count
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Database error: {str(e)}"}
 
 @router.get("/suggestions")
 async def get_search_suggestions(
