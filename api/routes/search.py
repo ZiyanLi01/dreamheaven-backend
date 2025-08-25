@@ -261,7 +261,7 @@ async def search_listings(
     amenities: Optional[str] = Query(None, description="Comma-separated list of amenities"),
     available_only: bool = Query(True, description="Show only available listings"),
     featured_only: bool = Query(False, description="Show only featured listings"),
-    sort_by: str = Query("created_at", description="Sort by field (price_per_night, rating, created_at)"),
+    sort_by: str = Query("created_at", description="Sort by field (price_per_month, rating, created_at)"),
     sort_order: str = Query("desc", description="Sort order (asc, desc)"),
     page: int = Query(1, ge=1, description="Page number"),
     limit: Optional[int] = Query(None, ge=1, description="Number of results per page (None = all results)")
@@ -288,9 +288,9 @@ async def search_listings(
         if property_type:
             query = query.eq("property_type", property_type)
         if min_price is not None:
-            query = query.gte("price_per_night", min_price)
+            query = query.gte("price_per_month", min_price)
         if max_price is not None:
-            query = query.lte("price_per_night", max_price)
+            query = query.lte("price_per_month", max_price)
         if min_bedrooms is not None:
             query = query.gte("bedrooms", min_bedrooms)
         if max_bedrooms is not None:
@@ -329,9 +329,9 @@ async def search_listings(
         if property_type:
             count_query = count_query.eq("property_type", property_type)
         if min_price is not None:
-            count_query = count_query.gte("price_per_night", min_price)
+            count_query = count_query.gte("price_per_month", min_price)
         if max_price is not None:
-            count_query = count_query.lte("price_per_night", max_price)
+            count_query = count_query.lte("price_per_month", max_price)
         if min_bedrooms is not None:
             count_query = count_query.gte("bedrooms", min_bedrooms)
         if max_bedrooms is not None:
