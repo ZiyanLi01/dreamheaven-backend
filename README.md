@@ -2,29 +2,40 @@
 
 A modern FastAPI backend for the Dream Haven real estate platform, featuring AI-powered search capabilities and comprehensive property management.
 
-## Features
+## Overview
 
-- **FastAPI Backend**: High-performance REST API with automatic documentation
-- **Supabase Integration**: PostgreSQL database with real-time capabilities
-- **Data Generation**: Automated creation of realistic real estate data
+Dream Haven Backend is a production-ready REST API built with FastAPI that provides:
+
+- **High-performance property search** with advanced filtering and sorting
+- **User authentication and authorization** for buyers
+- **Real-time database operations** via Supabase
+- **AI-ready architecture** for future RAG integration
+- **Comprehensive property management** with 3000+ sample listings
+
+## Key Features
+
+- **FastAPI Backend**: High-performance REST API with automatic OpenAPI documentation
+- **Supabase Integration**: PostgreSQL database with real-time capabilities and built-in authentication
+- **Advanced Search**: Filter by location, price, bedrooms, bathrooms, and property type
+- **Pagination**: Server-side pagination with configurable page sizes
 - **Authentication**: Complete buyer authentication and authorization system
-- **Search API**: Advanced search with filters, sorting, and geolocation
-- **AI-Ready**: Prepared for RAG (Retrieval-Augmented Generation) integration
+- **Data Generation**: Automated creation of realistic real estate data
+- **Production Ready**: Clean, optimized codebase ready for deployment
 
 ## User Roles
 
-### **Hosts (Property Owners)**
+### Hosts (Property Owners)
 - Property owners who list their properties
-- Managed directly in the database (no authentication needed)
-- Currently: 5 demo hosts with 2000 listings
+- Managed directly in the database
+- Currently: 5 demo hosts with 3000+ listings
 
-### **Buyers (Property Seekers)**
+### Buyers (Property Seekers)
 - People looking to buy/rent properties
-- Need authentication for advanced features
+- Require authentication for advanced features
 - Can browse listings without login
-- Require login for AI-powered search
+- Need login for AI-powered search
 
-### **Visitors**
+### Visitors
 - Anonymous users browsing listings
 - No authentication required
 - Access to basic search and filtering
@@ -34,17 +45,13 @@ A modern FastAPI backend for the Dream Haven real estate platform, featuring AI-
 ```
 dreamheaven-backend/
 ├── main.py                 # FastAPI application entry point
-├── requirements.txt        # Python dependencies
+├── requirements.txt        # Production dependencies
 ├── env.example            # Environment variables template
+├── start.sh               # Production startup script
+├── DEPLOYMENT_CHECKLIST.md # Deployment guide
 ├── README.md              # This file
-├── scripts/               # Data generation scripts
-│   ├── __init__.py
-│   ├── config.py          # Configuration management
-│   ├── data_generator.py  # Real estate data generation
-│   ├── supabase_manager.py # Database operations
-│   ├── generate_data.py   # Main data generation script
-│   └── upgrade_images.py  # One-click image upgrade
-├── api/                   # API routes
+├── .gitignore             # Git ignore rules
+├── api/                   # Core API routes
 │   ├── __init__.py
 │   └── routes/
 │       ├── __init__.py
@@ -52,10 +59,16 @@ dreamheaven-backend/
 │       ├── buyers.py      # Buyer management
 │       ├── listings.py    # Property listings CRUD
 │       └── search.py      # Search functionality
-└── data/                  # Generated data backups
+└── scripts/               # Maintenance utilities
+    ├── __init__.py
+    ├── config.py          # Configuration management
+    ├── data_generator.py  # Real estate data generation
+    ├── supabase_manager.py # Database operations
+    ├── generate_data.py   # Main data generation script
+    └── upgrade_images.py  # Image management utilities
 ```
 
-## Setup Instructions
+## Quick Start
 
 ### 1. Prerequisites
 
@@ -89,101 +102,43 @@ nano .env
 ```
 
 Required environment variables:
-- `SUPABASE_URL`: Your Supabase project URL
-- `SUPABASE_ANON_KEY`: Your Supabase anonymous key
-- `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase service role key
+```bash
+# Supabase Configuration (REQUIRED)
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# Optional: Database URL for direct access
+DATABASE_URL=postgresql://postgres:password@localhost:5432/dreamhaven
+
+# API Configuration
+API_HOST=0.0.0.0
+API_PORT=8000
+```
 
 ### 4. Database Setup
 
-Create the following tables in your Supabase database:
+The backend uses Supabase for database management. Ensure your Supabase project has the following tables:
 
-#### Profiles Table
-```sql
-CREATE TABLE profiles (
-    id UUID PRIMARY KEY REFERENCES auth.users(id),
-    email TEXT UNIQUE NOT NULL,
-    first_name TEXT,
-    last_name TEXT,
-    full_name TEXT,
-    phone TEXT,
-    avatar_url TEXT,
-    bio TEXT,
-    is_host BOOLEAN DEFAULT FALSE,
-    is_verified BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
-
-#### Listings Table
-```sql
-CREATE TABLE listings (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    host_id UUID REFERENCES profiles(id),
-    title TEXT NOT NULL,
-    description TEXT,
-    property_type TEXT,
-    bedrooms INTEGER,
-    bathrooms INTEGER,
-    max_guests INTEGER,
-    square_feet INTEGER,
-    price_per_night DECIMAL(10,2),
-    price_per_month DECIMAL(10,2),
-    city TEXT,
-    state TEXT,
-    country TEXT,
-    latitude DECIMAL(10,8),
-    longitude DECIMAL(11,8),
-    address TEXT,
-    neighborhood TEXT,
-    amenities TEXT[],
-    images TEXT[],
-    is_available BOOLEAN DEFAULT TRUE,
-    is_featured BOOLEAN DEFAULT FALSE,
-    rating DECIMAL(3,2) DEFAULT 0,
-    review_count INTEGER DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
+#### Listings Table (listings_v2)
+Contains all property listings with fields for:
+- Basic property info (title, description, type)
+- Location data (address, city, state, coordinates)
+- Property details (bedrooms, bathrooms, square feet)
+- Pricing (price_per_month for rentals, price_for_sale for sales)
+- Features (amenities, parking, yard)
+- Status (available, featured)
 
 #### Buyers Table
-```sql
-CREATE TABLE buyers (
-    id UUID PRIMARY KEY REFERENCES auth.users(id),
-    email TEXT UNIQUE NOT NULL,
-    first_name TEXT,
-    last_name TEXT,
-    phone TEXT,
-    preferences JSONB,
-    is_verified BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+Contains authenticated buyer information:
+- User profile data (name, email, phone)
+- Preferences and settings
+- Verification status
 
--- Create indexes
-CREATE INDEX idx_buyers_email ON buyers(email);
-CREATE INDEX idx_buyers_verified ON buyers(is_verified);
-```
+#### Profiles Table
+Linked to Supabase Auth for user management.
 
-### 5. Database Migration
-
-Apply the database migration to add new fields for the enhanced listings API:
-
-```bash
-# Run the migration script
-python scripts/run_migration.py
-```
-
-This migration adds the following fields to the listings table:
-- `status` - Property status ("For Sale" or "For Rent")
-- `garages` - Number of garage spaces
-- `agent_name` - Name of the listing agent
-- `listing_age_days` - Days since listing was created
-- `image_url` - Primary image URL
-- Performance indexes for better query performance
-
-### 6. Data Generation
+### 5. Data Generation
 
 Generate sample data for testing:
 
@@ -204,7 +159,7 @@ python scripts/generate_data.py cleanup
 python scripts/generate_data.py help
 ```
 
-### 7. Run the Application
+### 6. Run the Application
 
 ```bash
 # Development mode
@@ -212,6 +167,9 @@ python main.py
 
 # Or using uvicorn directly
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+# Or use the startup script
+./start.sh
 ```
 
 The API will be available at:
@@ -221,22 +179,27 @@ The API will be available at:
 
 ## API Endpoints
 
-### Authentication (`/api/auth`)
-- `POST /login` - Buyer login
+### Core Endpoints
+- `GET /` - Welcome message and API info
+- `GET /health` - Health check endpoint
+- `GET /debug` - Debug information and database status
+
+### Authentication (`/auth`)
 - `POST /register` - Buyer registration
+- `POST /login` - Buyer login
 - `POST /logout` - Buyer logout
 - `POST /refresh` - Refresh access token
-- `GET /me` - Get current buyer
+- `GET /me` - Get current buyer profile
 - `POST /forgot-password` - Send password reset email
 - `POST /reset-password` - Reset password
 - `POST /change-password` - Change password
 - `POST /verify-email` - Verify email address
 
-### Buyers (`/api/buyers`)
-- `GET /` - Get all buyers
+### Buyers (`/buyers`)
+- `GET /` - Get all buyers with optional filters
 - `GET /{buyer_id}` - Get specific buyer
 - `GET /email/{email}` - Get buyer by email
-- `PUT /{buyer_id}` - Update buyer
+- `PUT /{buyer_id}` - Update buyer profile
 - `DELETE /{buyer_id}` - Delete buyer
 - `GET /verified/list` - Get verified buyers
 - `PUT /{buyer_id}/verify` - Verify buyer
@@ -244,8 +207,8 @@ The API will be available at:
 - `PUT /{buyer_id}/preferences` - Update buyer preferences
 - `GET /{buyer_id}/preferences` - Get buyer preferences
 
-### Listings (`/api/listings`)
-- `GET /` - Get filtered property listings with pagination support
+### Listings (`/listings`)
+- `GET /` - Get filtered property listings with pagination
   - **Query Parameters:**
     - `location` (optional) - Filter by city/location
     - `bedrooms` (optional, int) - Filter by number of bedrooms
@@ -256,8 +219,8 @@ The API will be available at:
   - **Response Format:**
     ```json
     {
-      "results": [
-        {
+      "results": {
+        "listing_id": {
           "id": "uuid",
           "status": "For Sale",
           "address": "123 Main St",
@@ -266,111 +229,82 @@ The API will be available at:
           "garages": 2,
           "bedrooms": 3,
           "bathrooms": 2,
-          "agent": "John Smith",
-          "listingAge": "5 days ago",
-          "price": 450000.00,
+          "agent": "John Doe",
+          "listingAge": "2 days",
+          "price": 750000,
           "imageUrl": "https://example.com/image.jpg"
         }
-      ],
+      },
       "page": 1,
       "limit": 30,
       "total": 150,
       "has_more": true
     }
     ```
-- `GET /{listing_id}` - Get specific listing
-- `POST /` - Create listing
-- `PUT /{listing_id}` - Update listing
-- `DELETE /{listing_id}` - Delete listing
-- `GET /host/{host_id}` - Get listings by host
-- `GET /cities/list` - Get all cities
-- `GET /types/list` - Get all property types
+- `GET /{listing_id}` - Get specific listing details
+- `GET /types` - Get available property types
 
-### Search (`/api/search`)
-- `GET /` - Search listings with filters (public)
-- `GET /nearby` - Search listings by location (public)
-- `GET /suggestions` - Get search suggestions (public)
-- `GET /stats` - Get search statistics (public)
-- `POST /ai-search` - AI-powered search (requires authentication)
+### Search (`/search`)
+- `GET /` - Search listings with query parameters
+  - **Query Parameters:**
+    - `q` (optional) - Search query for title, description, city, neighborhood
+    - `city`, `state` (optional) - Location filters
+    - `property_type` (optional) - Property type filter
+    - `min_price`, `max_price` (optional) - Price range filters
+    - `min_bedrooms`, `max_bedrooms` (optional) - Bedroom range filters
+    - `min_bathrooms` (optional) - Minimum bathrooms filter
+    - `amenities` (optional) - Comma-separated amenities list
+    - `available_only` (default: true) - Show only available listings
+    - `featured_only` (default: false) - Show only featured listings
+    - `sort_by` (default: "created_at") - Sort field
+    - `sort_order` (default: "desc") - Sort direction (asc/desc)
+    - `page` (default: 1) - Page number
+    - `limit` (default: 30) - Results per page
 
-## Configuration
+- `POST /` - AI-powered search with advanced filters
+  - **Request Body:**
+    ```json
+    {
+      "query": "luxury apartments in downtown",
+      "location": "San Francisco, CA",
+      "bed": "2+",
+      "bath": "2",
+      "rent": "For Rent",
+      "sortBy": "price",
+      "sortOrder": "asc",
+      "page": 1,
+      "limit": 30
+    }
+    ```
 
-### Environment Variables
+## Data Management
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SUPABASE_URL` | Supabase project URL | Required |
-| `SUPABASE_ANON_KEY` | Supabase anonymous key | Required |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key | Required |
-| `API_HOST` | API host address | `0.0.0.0` |
-| `API_PORT` | API port | `8000` |
-| `NUM_HOSTS` | Number of hosts to generate | `5` |
-| `NUM_LISTINGS` | Number of listings to generate | `2000` |
+### Sample Data
+The backend includes comprehensive sample data:
+- **3000+ property listings** across multiple cities
+- **5 demo hosts** with realistic profiles
+- **Diverse property types**: Apartments, houses, condos, townhouses
+- **Realistic pricing** for both rentals and sales
+- **High-quality images** from Unsplash
 
-### Data Generation Configuration
-
-The data generator creates realistic real estate data including:
-- **10 Major US Cities**: San Francisco, New York, Los Angeles, Chicago, Miami, Seattle, Austin, Denver, Portland, Nashville
-- **10 Property Types**: Apartment, House, Condo, Townhouse, Villa, Studio, Loft, Penthouse, Duplex, Cottage
-- **21 Amenities**: WiFi, Air Conditioning, Heating, Kitchen, Washing Machine, Dryer, Dishwasher, Parking, Gym, Pool, Garden, Balcony, Fireplace, Elevator, Doorman, Security System, Pet Friendly, Furnished, Mountain View, Ocean View, City View
-
-## Testing
-
-```bash
-# Run tests (when implemented)
-pytest
-
-# Test specific endpoint
-curl http://localhost:8000/health
-
-# Test the new filtered listings endpoint
-python test_listings_endpoint.py
-```
-
-### Testing the Filtered Listings Endpoint
-
-The `test_listings_endpoint.py` script provides comprehensive testing for the new filtered listings API:
-
-```bash
-# Run all tests
-python test_listings_endpoint.py
-
-# Test specific scenarios:
-# - Basic endpoint without filters
-# - Pagination (page, limit)
-# - Location filtering
-# - Bedrooms/bathrooms filtering
-# - Status filtering (For Sale/For Rent)
-# - Combined filters
-# - Edge cases
-```
-
-Example API calls:
-
-```bash
-# Get all listings (first page)
-curl "http://localhost:8000/api/listings"
-
-# Get listings in New York with 3 bedrooms
-curl "http://localhost:8000/api/listings?location=New%20York&bedrooms=3"
-
-# Get "For Sale" properties with pagination
-curl "http://localhost:8000/api/listings?status=For%20Sale&page=2&limit=10"
-
-# Combined filters
-curl "http://localhost:8000/api/listings?location=Los%20Angeles&bedrooms=2&bathrooms=2&status=For%20Rent&page=1&limit=5"
-```
+### Data Generation Scripts
+Located in the `scripts/` directory:
+- `data_generator.py` - Core data generation logic
+- `generate_data.py` - Main script for creating sample data
+- `supabase_manager.py` - Database operations and management
+- `upgrade_images.py` - Image quality management
+- `config.py` - Configuration management
 
 ## Deployment
 
-### Railway Deployment
+### Production Deployment Options
 
+#### Option 1: Railway (Recommended)
 1. Connect your GitHub repository to Railway
 2. Set environment variables in Railway dashboard
 3. Deploy automatically on push
 
-### Docker Deployment
-
+#### Option 2: Docker
 ```dockerfile
 FROM python:3.11-slim
 
@@ -384,93 +318,89 @@ EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-## High-Quality Image Management
-
-### **Image Upgrade Process**
-The backend includes scripts to fetch and validate high-quality images:
-
-#### **Option 1: No API Key Required (Recommended for MVP)**
+#### Option 3: Direct Server
 ```bash
-# One-click upgrade (no API key needed)
-python scripts/upgrade_images.py
+# Install dependencies
+pip install -r requirements.txt
 
-# Or step by step:
-python scripts/fetch_high_quality_images.py
-python scripts/update_listings_with_images.py
+# Set environment variables
+cp env.example .env
+# Edit .env with your values
+
+# Start server
+python main.py
 ```
 
-#### **Option 2: With Unsplash API Key (For Production)**
+### Environment Variables
+Ensure all required environment variables are set in production:
+- `SUPABASE_URL` - Your Supabase project URL
+- `SUPABASE_ANON_KEY` - Your Supabase anonymous key
+- `SUPABASE_SERVICE_ROLE_KEY` - Your Supabase service role key
+
+### CORS Configuration
+The backend is configured for:
+- Development: `http://localhost:3000`
+- Production: `https://dreamheaven.vercel.app`
+
+## Testing
+
+### Health Check
 ```bash
-# Requires UNSPLASH_ACCESS_KEY in .env
-python scripts/fetch_unsplash_images.py
-python scripts/update_listings_with_images.py
+curl http://localhost:8000/health
 ```
 
-### **Setup Options**
+### API Documentation
+Visit http://localhost:8000/docs for interactive API documentation.
 
-#### **Quick Start (No API Key)**
-No setup required! Uses curated high-quality images:
-- **50 pre-selected high-quality images**
-- **No API key needed**
-- **Immediate use**
-
-#### **Production Setup (With API Key)**
-Add your Unsplash API key to `.env`:
+### Sample API Calls
 ```bash
-UNSPLASH_ACCESS_KEY=your_unsplash_access_key
+# Get all listings
+curl "http://localhost:8000/listings"
+
+# Search for properties in San Francisco
+curl "http://localhost:8000/listings?location=San%20Francisco"
+
+# Get listings with 3 bedrooms
+curl "http://localhost:8000/listings?bedrooms=3"
+
+# Search with AI
+curl -X POST "http://localhost:8000/search/" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "luxury apartments", "location": "New York"}'
 ```
-Benefits:
-- **Dynamic image selection**
-- **Higher rate limits**
-- **Better search results**
 
-### **Image Statistics**
-- **10 high-quality images** (curated or from API)
-- **2000 listings** with 1 image each
-- **200x image reuse** (2000 ÷ 10)
-- **Verified URLs** - all images tested and working
+## Maintenance
 
+### Database Management
+- Use Supabase dashboard for schema changes
+- Scripts in `scripts/` directory for data operations
+- Regular backups recommended
 
+### Performance Optimization
+- Database-level sorting for better performance
+- Pagination to handle large datasets
+- Efficient query patterns implemented
 
-## ETL Pipelines
-
-**Note**: ETL pipelines for data preparation and embedding generation have been moved to the RAG system (`dreamheaven-rag` repository) where they logically belong for AI-powered search functionality.
-
-The RAG system includes:
-- **ETL #1**: Structured tags generation from property data
-- **ETL #2**: Embedding text generation for AI search
-- **Configuration**: Rule-based tag generation and text extraction
-- **Job Scripts**: Automated ETL execution with dry-run support
-- **Testing**: Comprehensive unit tests for ETL pipelines
-
-## Future Features
-
-- **RAG Integration**: AI-powered natural language search
-- **Real-time Updates**: WebSocket support for live updates
-- **Image Upload**: Property image management
-- **Booking System**: Reservation and payment processing
-- **Reviews & Ratings**: User review system
-- **Analytics**: Property performance metrics
+### Monitoring
+- Health check endpoint for monitoring
+- Debug endpoint for troubleshooting
+- Comprehensive error handling
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests if applicable
+4. Test thoroughly
 5. Submit a pull request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 
 ## Support
 
 For support and questions:
-- Create an issue in the repository
 - Check the API documentation at `/docs`
-- Review the Supabase documentation
-
----
-
-**Dream Haven Backend** - Building the future of real estate search 
+- Review the deployment checklist in `DEPLOYMENT_CHECKLIST.md`
+- Check the health endpoint at `/health` 

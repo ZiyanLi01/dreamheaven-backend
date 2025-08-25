@@ -14,10 +14,10 @@ from api.routes import listings, buyers, auth, search
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print("🚀 Dream Haven Backend starting up...")
+    print("Dream Haven Backend starting up...")
     yield
     # Shutdown
-    print("🛑 Dream Haven Backend shutting down...")
+    print("Dream Haven Backend shutting down...")
 
 app = FastAPI(
     title="Dream Haven Backend",
@@ -44,7 +44,7 @@ app.include_router(search.router, prefix="/search", tags=["Search"])
 @app.get("/")
 async def root():
     return {
-        "message": "Welcome to Dream Haven Backend! 🏠",
+        "message": "Welcome to Dream Haven Backend!",
         "version": "1.0.0",
         "docs": "/docs"
     }

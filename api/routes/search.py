@@ -56,7 +56,7 @@ class SearchRequest(BaseModel):
 
 @router.post("/", response_model=SearchResponse)
 async def search_listings_post(search_request: SearchRequest):
-    """Search listings with POST request - returns all results for frontend pagination"""
+    """Search listings with POST request - returns paginated results"""
     try:
         # Build query with ALL fields from the listings_v2 table
         query = supabase.client.table("listings_v2").select("*")
@@ -125,7 +125,7 @@ async def search_listings_post(search_request: SearchRequest):
             # Special handling for price sorting to consider both rent and sale prices
             if search_request.sortBy == "price":
                 # For price sorting, we need to fetch all data first, sort it, then paginate
-                print(f"🔍 Price sorting requested in AI search - will sort in Python after fetch")
+                print(f"Price sorting requested in AI search - will sort in Python after fetch")
             else:
                 # For non-price sorting, use the standard approach
                 sort_field_mapping = {
@@ -140,97 +140,100 @@ async def search_listings_post(search_request: SearchRequest):
                 else:
                     query = query.order(db_sort_field, desc=True)
         
-        # Handle price sorting differently - fetch all data first if sorting by price
-        if search_request.sortBy == "price":
-            # For price sorting, we need to fetch all data first, sort it, then paginate
-            try:
-                all_result = query.execute()
-                print(f"✅ Fetched all data for price sorting in AI search: {len(all_result.data) if all_result.data else 0} results")
+        # Apply pagination to all queries (both price and non-price sorting)
+        page = search_request.page
+        limit = search_request.limit or 30  # Default to 30 items per page
+        start_idx = (page - 1) * limit
+        end_idx = start_idx + limit
+        
+        # Apply pagination to database query
+        result = query.range(start_idx, end_idx - 1).execute()
+        
+        if result.data:
+            # Transform data to return full listing objects
+            listings_dict = {}
+            for item in result.data:
+                # Return the full listing object as-is from the database
+                # This includes all fields: id, title, description, property_type, property_listing_type,
+                # bedrooms, bathrooms, square_feet, garage_number, price_per_month, price_for_sale,
+                # city, state, country, latitude, longitude, address, neighborhood,
+                # has_yard, has_parking_lot, amenities, images, is_available, is_featured, rating, review_count
                 
-                if all_result.data:
-                    # Create a list of items with their effective price for sorting
-                    items_with_price = []
-                    for item in all_result.data:
-                        # Determine the effective price (sale price or monthly rent)
-                        sale_price = item.get("price_for_sale")
-                        monthly_price = item.get("price_per_month")
-                        
-                        # Use sale price if available, otherwise use monthly price
-                        effective_price = sale_price if sale_price is not None else monthly_price
-                        
-                        # Skip items with no price
-                        if effective_price is not None:
-                            items_with_price.append((item, effective_price))
-                    
-                    # Sort by effective price
-                    if sort_direction == "asc":
-                        items_with_price.sort(key=lambda x: x[1])
-                    else:
-                        items_with_price.sort(key=lambda x: x[1], reverse=True)
-                    
-                    # Extract sorted items
-                    sorted_items = [item[0] for item in items_with_price]
-                    print(f"✅ Sorted {len(sorted_items)} items by price ({sort_direction}) in AI search")
-                    
-                    # Return all sorted results for frontend pagination
-                    listings_dict = {}
-                    for item in sorted_items:
-                        listings_dict[item.get("id", "")] = item
-                    
-                    return SearchResponse(
-                        results=listings_dict,
-                        total=len(sorted_items),
-                        page=1,
-                        limit=len(sorted_items),
-                        has_more=False
-                    )
-                else:
-                    return SearchResponse(
-                        results={},
-                        total=0,
-                        page=1,
-                        limit=0,
-                        has_more=False
-                    )
-                    
-            except Exception as e:
-                print(f"❌ Error executing price sorting query in AI search: {str(e)}")
-                raise HTTPException(status_code=500, detail=f"Error fetching results for price sorting: {str(e)}")
-        else:
-            # For non-price sorting, return all results for frontend pagination
-            result = query.execute()
+                # Use the listing ID as the key in the dictionary
+                listings_dict[item.get("id", "")] = item
             
-            if result.data:
-                # Transform data to return full listing objects
-                listings_dict = {}
-                for item in result.data:
-                    # Return the full listing object as-is from the database
-                    # This includes all fields: id, title, description, property_type, property_listing_type,
-                    # bedrooms, bathrooms, square_feet, garage_number, price_per_month, price_for_sale,
-                    # city, state, country, latitude, longitude, address, neighborhood,
-                    # has_yard, has_parking_lot, amenities, images, is_available, is_featured, rating, review_count
-                    
-                    # Use the listing ID as the key in the dictionary
-                    listings_dict[item.get("id", "")] = item
-                
-                return SearchResponse(
-                    results=listings_dict,
-                    total=len(result.data),
-                    page=1,
-                    limit=len(result.data),
-                    has_more=False
-                )
-            else:
-                return SearchResponse(
-                    results={},
-                    total=0,
-                    page=1,
-                    limit=0,
-                    has_more=False
-                )
+            # Get total count for pagination info - NO RANGE LIMITS
+            count_query = supabase.client.table("listings_v2").select("id", count="exact")
+            
+            # Apply the same filters to the count query
+            if search_request.location:
+                location_parts = search_request.location.split(',')
+                if len(location_parts) == 2:
+                    city = location_parts[0].strip()
+                    state = location_parts[1].strip()
+                    count_query = count_query.eq("city", city).eq("state", state)
+                else:
+                    count_query = count_query.eq("city", search_request.location.strip())
+            
+            if search_request.bed and search_request.bed != "Any":
+                if search_request.bed.endswith("+"):
+                    try:
+                        min_beds = int(search_request.bed[:-1])
+                        count_query = count_query.gte("bedrooms", min_beds)
+                    except ValueError:
+                        pass
+                else:
+                    try:
+                        bed_count = int(search_request.bed)
+                        count_query = count_query.eq("bedrooms", bed_count)
+                    except ValueError:
+                        pass
+            
+            if search_request.bath and search_request.bath != "Any":
+                if search_request.bath.endswith("+"):
+                    try:
+                        min_baths = int(search_request.bath[:-1])
+                        count_query = count_query.gte("bathrooms", min_baths)
+                    except ValueError:
+                        pass
+                else:
+                    try:
+                        bath_count = int(search_request.bath)
+                        count_query = count_query.eq("bathrooms", bath_count)
+                    except ValueError:
+                        pass
+            
+            if search_request.rent:
+                if search_request.rent == "For Rent":
+                    count_query = count_query.in_("property_listing_type", ["rent", "both"])
+                elif search_request.rent == "For Sale":
+                    count_query = count_query.in_("property_listing_type", ["sale", "both"])
+            
+            # Execute count query without any range limits
+            total_result = count_query.execute()
+            total_count = total_result.count if hasattr(total_result, 'count') else 0
+            
+            # Check if there are more results
+            has_more = end_idx < total_count
+            
+            return SearchResponse(
+                results=listings_dict,
+                total=total_count,
+                page=page,
+                limit=len(result.data),
+                has_more=has_more
+            )
+        else:
+            return SearchResponse(
+                results={},
+                total=0,
+                page=1,
+                limit=0,
+                has_more=False
+            )
             
     except Exception as e:
-        print(f"❌ Error in search_listings_post: {str(e)}")
+        print(f"Error in search_listings_post: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 @router.get("/", response_model=SearchResponse)
@@ -250,7 +253,7 @@ async def search_listings(
     sort_by: str = Query("created_at", description="Sort by field (price_per_night, rating, created_at)"),
     sort_order: str = Query("desc", description="Sort order (asc, desc)"),
     page: int = Query(1, ge=1, description="Page number"),
-    limit: Optional[int] = Query(None, ge=1, le=1000, description="Number of results per page (None = all results)")
+    limit: Optional[int] = Query(None, ge=1, description="Number of results per page (None = all results)")
 ):
     """Search listings with various filters and sorting options"""
     try:
@@ -290,12 +293,46 @@ async def search_listings(
         else:
             query = query.order(sort_by, desc=True)
         
-        # Execute query to get all results
-        result = query.execute()
-        listings = result.data if result.data else []
-        total = len(listings)
+        # Apply pagination
+        start_idx = (page - 1) * (limit or 30)
+        end_idx = start_idx + (limit or 30) - 1
         
-        # Filter by amenities if specified
+        # Execute query with pagination
+        result = query.range(start_idx, end_idx).execute()
+        listings = result.data if result.data else []
+        
+        # Get total count for pagination info - NO RANGE LIMITS
+        count_query = supabase.client.table("listings_v2").select("id", count="exact")
+        
+        # Apply the same filters to the count query
+        if q:
+            count_query = count_query.or_(f"title.ilike.%{q}%,description.ilike.%{q}%,city.ilike.%{q}%,neighborhood.ilike.%{q}%")
+        if city:
+            count_query = count_query.eq("city", city)
+        if state:
+            count_query = count_query.eq("state", state)
+        if property_type:
+            count_query = count_query.eq("property_type", property_type)
+        if min_price is not None:
+            count_query = count_query.gte("price_per_night", min_price)
+        if max_price is not None:
+            count_query = count_query.lte("price_per_night", max_price)
+        if min_bedrooms is not None:
+            count_query = count_query.gte("bedrooms", min_bedrooms)
+        if max_bedrooms is not None:
+            count_query = count_query.lte("bedrooms", max_bedrooms)
+        if min_bathrooms is not None:
+            count_query = count_query.gte("bathrooms", min_bathrooms)
+        if available_only:
+            count_query = count_query.eq("is_available", True)
+        if featured_only:
+            count_query = count_query.eq("is_featured", True)
+        
+        # Execute count query without any range limits
+        total_result = count_query.execute()
+        total = total_result.count if hasattr(total_result, 'count') else 0
+        
+        # Filter by amenities if specified (apply to current page only)
         if amenities:
             amenity_list = [a.strip() for a in amenities.split(",")]
             filtered_listings = []
@@ -311,12 +348,15 @@ async def search_listings(
         for listing in listings:
             listings_dict[listing.get("id", "")] = listing
         
+        # Check if there are more results
+        has_more = end_idx + 1 < total
+        
         return SearchResponse(
             results=listings_dict,
             total=total,
-            page=1,
-            limit=total,
-            has_more=False
+            page=page,
+            limit=len(listings),
+            has_more=has_more
         )
         
     except Exception as e:
@@ -327,7 +367,7 @@ async def search_nearby(
     latitude: float = Query(..., description="Latitude"),
     longitude: float = Query(..., description="Longitude"),
     radius_km: float = Query(10.0, ge=0.1, le=100.0, description="Search radius in kilometers"),
-    limit: Optional[int] = Query(None, ge=1, le=1000, description="Number of results (None = all results)")
+    limit: Optional[int] = Query(None, ge=1, description="Number of results (None = all results)")
 ):
     """Search for listings near a specific location"""
     try:

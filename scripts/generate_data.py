@@ -19,7 +19,7 @@ from scripts.supabase_manager import SupabaseManager
 
 def main():
     """Main function to generate and upload data"""
-    print("🏠 Dream Haven Data Generation")
+    print("Dream Haven Data Generation")
     print("=" * 50)
     
     try:
@@ -37,14 +37,14 @@ def main():
         num_hosts = Config.NUM_HOSTS
         num_listings = Config.NUM_LISTINGS
         
-        print(f"\n📊 Configuration:")
+        print(f"\nConfiguration:")
         print(f"   - Number of hosts: {num_hosts}")
         print(f"   - Number of listings: {num_listings}")
         
         # Ask for confirmation
-        response = input("\n❓ Do you want to proceed with data generation? (y/N): ")
+        response = input("\n Do you want to proceed with data generation? (y/N): ")
         if response.lower() != 'y':
-            print("❌ Data generation cancelled.")
+            print("Data generation cancelled.")
             return
         
         # Step 1: Generate and create hosts
@@ -54,28 +54,28 @@ def main():
         created_hosts = supabase.create_users_batch(hosts_data)
         
         if not created_hosts:
-            print("❌ No hosts were created. Exiting.")
+            print("No hosts were created. Exiting.")
             return
         
         # Extract host IDs for listings
         host_ids = [host["auth_user"].id for host in created_hosts if host.get("auth_user")]
         
         if not host_ids:
-            print("❌ No valid host IDs found. Exiting.")
+            print("No valid host IDs found. Exiting.")
             return
         
-        print(f"✅ Successfully created {len(created_hosts)} hosts")
+        print(f"Successfully created {len(created_hosts)} hosts")
         
         # Step 2: Generate and create listings
-        print(f"\n🏘️  Step 2: Creating {num_listings} listings in listings_v2 table...")
+        print(f"\nStep 2: Creating {num_listings} listings in listings_v2 table...")
         listings_data = generator.generate_listings_v2(host_ids, num_listings)
         
         created_listings = supabase.create_listings_batch(listings_data)
         
-        print(f"✅ Successfully created {len(created_listings)} listings")
+        print(f"Successfully created {len(created_listings)} listings")
         
         # Step 3: Generate summary report
-        print(f"\n📈 Summary Report:")
+        print(f"\nSummary Report:")
         print(f"   - Hosts created: {len(created_hosts)}")
         print(f"   - Listings created: {len(created_listings)}")
         
@@ -88,17 +88,17 @@ def main():
         with open(f"data/listings_{timestamp}.json", "w") as f:
             json.dump(listings_data, f, indent=2, default=str)
         
-        print(f"💾 Data saved to data/hosts_{timestamp}.json and data/listings_{timestamp}.json")
+        print(f"Data saved to data/hosts_{timestamp}.json and data/listings_{timestamp}.json")
         
-        print("\n🎉 Data generation completed successfully!")
+        print("\nData generation completed successfully!")
         
     except Exception as e:
-        print(f"❌ Error during data generation: {str(e)}")
+        print(f"Error during data generation: {str(e)}")
         sys.exit(1)
 
 def generate_hosts_only():
     """Generate only hosts (for testing)"""
-    print("👥 Dream Haven - Host Generation Only")
+    print("Dream Haven - Host Generation Only")
     print("=" * 40)
     
     try:
@@ -113,15 +113,15 @@ def generate_hosts_only():
         hosts_data = generator.generate_hosts(num_hosts)
         created_hosts = supabase.create_users_batch(hosts_data)
         
-        print(f"✅ Successfully created {len(created_hosts)} hosts")
+        print(f"Successfully created {len(created_hosts)} hosts")
         
     except Exception as e:
-        print(f"❌ Error: {str(e)}")
+        print(f"Error: {str(e)}")
         sys.exit(1)
 
 def generate_listings_only():
     """Generate only listings (requires existing hosts)"""
-    print("🏘️  Dream Haven - Listing Generation Only")
+    print("Dream Haven - Listing Generation Only")
     print("=" * 40)
     
     try:
@@ -133,7 +133,7 @@ def generate_listings_only():
         # Get existing hosts
         existing_hosts = supabase.get_all_users()
         if not existing_hosts:
-            print("❌ No existing hosts found. Please create hosts first.")
+            print("No existing hosts found. Please create hosts first.")
             return
         
         host_ids = [host["id"] for host in existing_hosts]
@@ -145,31 +145,31 @@ def generate_listings_only():
         listings_data = generator.generate_listings_v2(host_ids, num_listings)
         created_listings = supabase.create_listings_batch(listings_data)
         
-        print(f"✅ Successfully created {len(created_listings)} listings")
+        print(f"Successfully created {len(created_listings)} listings")
         
     except Exception as e:
-        print(f"❌ Error: {str(e)}")
+        print(f" Error: {str(e)}")
         sys.exit(1)
 
 def cleanup_data():
     """Clean up all data (for testing)"""
-    print("🧹 Dream Haven - Data Cleanup")
+    print("Dream Haven - Data Cleanup")
     print("=" * 30)
     
     try:
         Config.validate_config()
         supabase = SupabaseManager()
         
-        response = input("⚠️  This will delete ALL listings. Are you sure? (y/N): ")
+        response = input("WARNING: This will delete ALL listings. Are you sure? (y/N): ")
         if response.lower() != 'y':
-            print("❌ Cleanup cancelled.")
+            print(" Cleanup cancelled.")
             return
         
         supabase.delete_all_data()
-        print("✅ Data cleanup completed")
+        print(" Data cleanup completed")
         
     except Exception as e:
-        print(f"❌ Error: {str(e)}")
+        print(f" Error: {str(e)}")
         sys.exit(1)
 
 if __name__ == "__main__":
@@ -193,7 +193,7 @@ if __name__ == "__main__":
             print("  python generate_data.py cleanup  # Clean up all data")
             print("  python generate_data.py help     # Show this help")
         else:
-            print(f"❌ Unknown command: {command}")
+            print(f"Unknown command: {command}")
             print("Use 'python generate_data.py help' for usage information")
     else:
         main() 

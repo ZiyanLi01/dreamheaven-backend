@@ -561,5 +561,5 @@ Requirements:
             host_id = random.choice(host_ids)
             listing = self.generate_listing_v2(host_id)
             listings.append(listing)
-            print(f"✅ Generated listing_v2 {i+1}/{count}: {listing.get('title', 'Untitled')}")
+            print(f"Generated listing_v2 {i+1}/{count}: {listing.get('title', 'Untitled')}")
         return listings 
