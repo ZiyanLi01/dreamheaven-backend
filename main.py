@@ -27,12 +27,16 @@ app = FastAPI(
 )
 
 # Configure CORS
+# Configure allowed origins and CORS headers
+# FRONTEND_ORIGIN can be set in Railway/production to your actual domain, e.g., https://yourdomain.com
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "https://dreamheaven.vercel.app")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://dreamheaven.vercel.app"],
+    allow_origins=["http://localhost:3000", FRONTEND_ORIGIN],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
 
 # Include routers without /api prefix for cleaner URLs
@@ -75,9 +79,11 @@ async def debug_request():
     }
 
 if __name__ == "__main__":
+    # Railway sets PORT environment variable; default to 8080 locally
+    port = int(os.getenv("PORT", "8080"))
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8080,
+        port=port,
         reload=True
-    ) 
+    )
