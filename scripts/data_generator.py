@@ -32,22 +32,23 @@ class RealEstateDataGenerator:
         
         self.cities = [
             {"name": "San Francisco", "state": "CA", "lat": 37.7749, "lng": -122.4194},
-            {"name": "New York", "state": "NY", "lat": 40.7128, "lng": -74.0060},
-            {"name": "Los Angeles", "state": "CA", "lat": 34.0522, "lng": -118.2437},
-            {"name": "Chicago", "state": "IL", "lat": 41.8781, "lng": -87.6298},
-            {"name": "Miami", "state": "FL", "lat": 25.7617, "lng": -80.1918},
-            {"name": "Seattle", "state": "WA", "lat": 47.6062, "lng": -122.3321},
-            {"name": "Austin", "state": "TX", "lat": 30.2672, "lng": -97.7431},
-            {"name": "Denver", "state": "CO", "lat": 39.7392, "lng": -104.9903},
-            {"name": "Portland", "state": "OR", "lat": 45.5152, "lng": -122.6784},
-            {"name": "Nashville", "state": "TN", "lat": 36.1627, "lng": -86.7816}
         ]
         
         self.neighborhoods = [
-            "Downtown", "Midtown", "Uptown", "Westside", "Eastside", 
-            "North End", "South End", "Historic District", "Arts District",
-            "Financial District", "University District", "Waterfront",
-            "Hills", "Valley", "Heights", "Park", "Square", "Plaza"
+            "Civic Center", "Downtown", "Union Square", "Tenderloin", "SoMa", "Chinatown", 
+            "Financial District", "Nob Hill", "North Beach", "Russian Hill", "Telegraph Hill", 
+            "Cow Hollow", "Marina", "Pacific Heights", "Presidio", "Presidio Heights", 
+            "Alamo Square", "Anza Vista", "Cathedral Hill", "Fillmore", "Japantown", 
+            "Western Addition", "Hayes Valley", "Buena Vista", "Castro", "Corona Heights", 
+            "Duboce Triangle", "Haight-Ashbury", "Noe Valley", "Mission", "Potrero Hill", 
+            "Dogpatch", "Mission Bay", "Mission Dolores", "Bernal Heights", "Diamond Heights", 
+            "Glen Park", "Twin Peaks", "Balboa Terrace", "Forest Hill", "Forest Knolls", 
+            "Ingleside", "Ingleside Terraces", "Miraloma Park", "Monterey Heights", 
+            "Mt. Davidson Manor", "St. Francis Wood", "Sunnyside", "Westwood Highlands", 
+            "Westwood Park", "Richmond", "Lake Street", "Laurel Heights", "Sea Cliff", 
+            "Sunset", "Parkside", "Bayview-Hunters Point", "Crocker-Amazon", "Excelsior", 
+            "Little Hollywood", "McLaren Park", "Oceanview", "Silver Terrace", "Visitacion Valley", 
+            "Tendernob", "South Beach", "Yerba Buena", "Hunters Point", "India Basin"
         ]
     
     def generate_host(self) -> Dict[str, Any]:

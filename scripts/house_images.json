@@ -1,0 +1,21 @@
+{
+  "total_images": 10,
+  "query": "house",
+  "images": [
+    "https://images.unsplash.com/photo-1570129477492-45c003edd2be?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3ODgwMTN8MHwxfHNlYXJjaHwxfHxob3VzZXxlbnwwfDB8fHwxNzU2MDgxNjc2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+    "https://images.unsplash.com/photo-1572120360610-d971b9d7767c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3ODgwMTN8MHwxfHNlYXJjaHwyfHxob3VzZXxlbnwwfDB8fHwxNzU2MDgxNjc2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+    "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3ODgwMTN8MHwxfHNlYXJjaHwzfHxob3VzZXxlbnwwfDB8fHwxNzU2MDgxNjc2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+    "https://images.unsplash.com/photo-1480074568708-e7b720bb3f09?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3ODgwMTN8MHwxfHNlYXJjaHw0fHxob3VzZXxlbnwwfDB8fHwxNzU2MDgxNjc2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+    "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3ODgwMTN8MHwxfHNlYXJjaHw1fHxob3VzZXxlbnwwfDB8fHwxNzU2MDgxNjc2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+    "https://images.unsplash.com/photo-1568605114967-8130f3a36994?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3ODgwMTN8MHwxfHNlYXJjaHw2fHxob3VzZXxlbnwwfDB8fHwxNzU2MDgxNjc2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+    "https://images.unsplash.com/photo-1494526585095-c41746248156?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3ODgwMTN8MHwxfHNlYXJjaHw3fHxob3VzZXxlbnwwfDB8fHwxNzU2MDgxNjc2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+    "https://images.unsplash.com/photo-1434082033009-b81d41d32e1c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3ODgwMTN8MHwxfHNlYXJjaHw4fHxob3VzZXxlbnwwfDB8fHwxNzU2MDgxNjc2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+    "https://images.unsplash.com/photo-1598228723793-52759bba239c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3ODgwMTN8MHwxfHNlYXJjaHw5fHxob3VzZXxlbnwwfDB8fHwxNzU2MDgxNjc2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+    "https://images.unsplash.com/photo-1583608205776-bfd35f0d9f83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3ODgwMTN8MHwxfHNlYXJjaHwxMHx8aG91c2V8ZW58MHwwfHx8MTc1NjA4MTY3Nnww&ixlib=rb-4.1.0&q=80&w=1080"
+  ],
+  "metadata": {
+    "source": "Unsplash API",
+    "validation": "Verified URLs",
+    "timestamp": "2024-08-16"
+  }
+}

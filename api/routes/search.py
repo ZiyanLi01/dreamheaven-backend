@@ -52,15 +52,12 @@ class SearchRequest(BaseModel):
     sortBy: Optional[str] = None
     sortOrder: Optional[str] = "asc"
     page: int = 1
-    limit: int = 30
+    limit: Optional[int] = None  # Remove default limit to return all results
 
 @router.post("/", response_model=SearchResponse)
 async def search_listings_post(search_request: SearchRequest):
-    """Search listings with POST request - handles frontend filter payload"""
+    """Search listings with POST request - returns all results for frontend pagination"""
     try:
-        # Calculate offset for pagination
-        offset = (search_request.page - 1) * search_request.limit
-        
         # Build query with ALL fields from the listings_v2 table
         query = supabase.client.table("listings_v2").select("*")
         
@@ -175,32 +172,24 @@ async def search_listings_post(search_request: SearchRequest):
                     sorted_items = [item[0] for item in items_with_price]
                     print(f"✅ Sorted {len(sorted_items)} items by price ({sort_direction}) in AI search")
                     
-                    # Apply pagination to sorted results
-                    start_idx = offset
-                    end_idx = offset + search_request.limit
-                    paginated_items = sorted_items[start_idx:end_idx]
-                    
-                    # Transform data to return full listing objects
+                    # Return all sorted results for frontend pagination
                     listings_dict = {}
-                    for item in paginated_items:
+                    for item in sorted_items:
                         listings_dict[item.get("id", "")] = item
-                    
-                    # Calculate if there are more pages
-                    has_more = (search_request.page * search_request.limit) < len(sorted_items)
                     
                     return SearchResponse(
                         results=listings_dict,
                         total=len(sorted_items),
-                        page=search_request.page,
-                        limit=search_request.limit,
-                        has_more=has_more
+                        page=1,
+                        limit=len(sorted_items),
+                        has_more=False
                     )
                 else:
                     return SearchResponse(
                         results={},
                         total=0,
-                        page=search_request.page,
-                        limit=search_request.limit,
+                        page=1,
+                        limit=0,
                         has_more=False
                     )
                     
@@ -208,14 +197,8 @@ async def search_listings_post(search_request: SearchRequest):
                 print(f"❌ Error executing price sorting query in AI search: {str(e)}")
                 raise HTTPException(status_code=500, detail=f"Error fetching results for price sorting: {str(e)}")
         else:
-            # For non-price sorting, use the standard approach with pagination
-            # Get total count first by executing the filtered query without pagination
-            count_result = query.execute()
-            total = len(count_result.data) if count_result.data else 0
-            
-            # Now apply pagination and execute again for the actual results
-            paginated_query = query.range(offset, offset + search_request.limit - 1)
-            result = paginated_query.execute()
+            # For non-price sorting, return all results for frontend pagination
+            result = query.execute()
             
             if result.data:
                 # Transform data to return full listing objects
@@ -230,22 +213,19 @@ async def search_listings_post(search_request: SearchRequest):
                     # Use the listing ID as the key in the dictionary
                     listings_dict[item.get("id", "")] = item
                 
-                # Calculate if there are more pages
-                has_more = (search_request.page * search_request.limit) < total
-                
                 return SearchResponse(
                     results=listings_dict,
-                    total=total,
-                    page=search_request.page,
-                    limit=search_request.limit,
-                    has_more=has_more
+                    total=len(result.data),
+                    page=1,
+                    limit=len(result.data),
+                    has_more=False
                 )
             else:
                 return SearchResponse(
                     results={},
                     total=0,
-                    page=search_request.page,
-                    limit=search_request.limit,
+                    page=1,
+                    limit=0,
                     has_more=False
                 )
             
@@ -270,13 +250,10 @@ async def search_listings(
     sort_by: str = Query("created_at", description="Sort by field (price_per_night, rating, created_at)"),
     sort_order: str = Query("desc", description="Sort order (asc, desc)"),
     page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(30, ge=1, le=100, description="Number of results per page")
+    limit: Optional[int] = Query(None, ge=1, le=1000, description="Number of results per page (None = all results)")
 ):
     """Search listings with various filters and sorting options"""
     try:
-        # Calculate offset for pagination
-        offset = (page - 1) * limit
-        
         # Build query
         query = supabase.client.table("listings_v2").select("*")
         
@@ -313,15 +290,10 @@ async def search_listings(
         else:
             query = query.order(sort_by, desc=True)
         
-        # Get total count first by executing the filtered query without pagination
-        count_result = query.execute()
-        total = len(count_result.data) if count_result.data else 0
-        
-        # Now apply pagination and execute again for the actual results
-        paginated_query = query.range(offset, offset + limit - 1)
-        result = paginated_query.execute()
-        
+        # Execute query to get all results
+        result = query.execute()
         listings = result.data if result.data else []
+        total = len(listings)
         
         # Filter by amenities if specified
         if amenities:
@@ -339,15 +311,12 @@ async def search_listings(
         for listing in listings:
             listings_dict[listing.get("id", "")] = listing
         
-        # Calculate if there are more results
-        has_more = (offset + limit) < total
-        
         return SearchResponse(
             results=listings_dict,
             total=total,
-            page=page,
-            limit=limit,
-            has_more=has_more
+            page=1,
+            limit=total,
+            has_more=False
         )
         
     except Exception as e:
@@ -358,7 +327,7 @@ async def search_nearby(
     latitude: float = Query(..., description="Latitude"),
     longitude: float = Query(..., description="Longitude"),
     radius_km: float = Query(10.0, ge=0.1, le=100.0, description="Search radius in kilometers"),
-    limit: int = Query(30, ge=1, le=100, description="Number of results")
+    limit: Optional[int] = Query(None, ge=1, le=1000, description="Number of results (None = all results)")
 ):
     """Search for listings near a specific location"""
     try:
